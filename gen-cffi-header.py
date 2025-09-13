@@ -100,10 +100,10 @@ def emit_typedef(cursor):
   t = cursor.underlying_typedef_type
 
   # Primitive types
-  if t.kind in {
-    TypeKind.INT, TypeKind.UINT, TypeKind.SHORT, TypeKind.USHORT,
-    TypeKind.LONG, TypeKind.ULONG, TypeKind.CHAR_S, TypeKind.CHAR_U,
-    TypeKind.FLOAT, TypeKind.DOUBLE, TypeKind.VOID
+  if normalize_spaces(t.spelling) in {
+    "unsigned char", "unsigned short", "unsigned int", "unsigned long",
+    "char", "short", "int", "long",
+    "float", "double", "void"
   }:
     return f"typedef {t.spelling} {typedef_name};"
 
