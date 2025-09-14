@@ -84,15 +84,15 @@ def get_constants_from_enum(decl):
       name = child.spelling
       val  = child.enum_value
       if val < 0x10:
-        constants.append(f"    {name} = {val},")
+        constants.append(f"  {name} = {val},")
       elif val < 0x100:
-        constants.append(f"    {name} = {val},")
+        constants.append(f"  {name} = {val},")
       elif val < 0x10000:
-        constants.append(f"    {name} = 0x{val:04X},")
+        constants.append(f"  {name} = 0x{val:04X},")
       elif val < 0x100000000:
-        constants.append(f"    {name} = 0x{val:08X},")
+        constants.append(f"  {name} = 0x{val:08X},")
       else:
-        constants.append(f"    {name} = {val},")
+        constants.append(f"  {name} = {val},")
   return constants
 
 
