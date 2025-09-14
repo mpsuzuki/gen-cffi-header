@@ -172,34 +172,52 @@ def emit_typedef(cursor):
 
   return None
 
-def emit_struct_union_enum_decl(cursor):
+def emit_struct_union_enum_decl(cursor, anon_union_counter = 0):
   if cursor.kind not in { CursorKind.STRUCT_DECL, CursorKind.UNION_DECL, CursorKind.ENUM_DECL }:
     return None
 
-  if not cursor.spelling:
-    print(f"/* anonymous structure, do not emit now */")
-    pass
-  elif has_typedef_sibling(cursor):
+  if has_typedef_sibling(cursor):
     print(f"/* has sibling, do not emit now */")
     pass
   elif cursor.kind == CursorKind.STRUCT_DECL:
-    print(f"/* cursor.kind = {str(cursor.kind)} */")
-    fields = get_fields_from_struct_or_union(cursor)
+    fields = get_fields_from_struct_or_union(cursor, indent = "  ")
     body = "\n".join(fields)
-    return f"struct {cursor.spelling} {{\n{body}\n}};"
+    if has_valid_spelling(cursor):
+      return f"struct {cursor.spelling} {{\n{body}\n}};"
+    else:
+      return None
   elif cursor.kind == CursorKind.UNION_DECL:
-    print(f"/* cursor.kind = {str(cursor.kind)} */")
-    fields = get_fields_from_struct_or_union(cursor)
+    fields = get_fields_from_struct_or_union(cursor, indent = "  ")
     body = "\n".join(fields)
-    return f"union {cursor.spelling} {{\n{body}\n}};"
+    if has_valid_spelling(cursor):
+      return f"union {cursor.spelling} {{\n{body}\n}};"
+    else:
+      return None
   elif cursor.kind == CursorKind.ENUM_DECL:
-    print(f"/* cursor.kind = {str(cursor.kind)} */")
     constants = get_constants_from_enum(cursor)
     body = "\n".join(constants)
-    return f"enum {cursor.spelling} {{\n{body}\n}};"
+    if has_valid_spelling(cursor):
+      return f"enum {cursor.spelling} {{\n{body}\n}};"
+    else:
+      return f"enum {{\n{body}\n}};"
   else:
-    print(f"/* cursor.kind = {str(cursor.kind)} */")
     return None
+
+def emit_function_decl(cursor):
+  if cursor.kind != CursorKind.FUNCTION_DECL:
+    return None
+
+  func_name = cursor.spelling
+  return_type = cursor.result_type.spelling
+
+  params = []
+  for arg in cursor.get_arguments():
+    arg_type = arg.type.spelling
+    arg_name = arg.spelling or "arg"
+    params.append(f"{arg_type} {arg_name}")
+
+  param_str = ", ".join(params)
+  return f"{return_type} {func_name}({param_str});"
 
 index = Index.create()
 tu = index.parse("test-variable.h", args = [
@@ -221,6 +239,10 @@ for cursor in tu.cursor.get_children():
       continue
 
     str_decl = emit_struct_union_enum_decl(cursor)
+    if str_decl:
+      print(str_decl)
+  elif cursor.kind == CursorKind.FUNCTION_DECL:
+    str_decl = emit_function_decl(cursor)
     if str_decl:
       print(str_decl)
 
