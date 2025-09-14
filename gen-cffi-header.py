@@ -1,5 +1,20 @@
 #!/usr/bin/env python
 
+import argparse
+import sys
+parser = argparse.ArgumentParser(add_help = True)
+parser.add_argument("--verbose", "-v", action = "store_true",
+                    help = "verbose mode")
+parser.add_argument("-I", dest = "include_dirs",
+                    action = "append", type = str, default = [],
+                    help = "Include directories")
+parser.add_argument("-D", dest = "defines",
+                    action = "append", type = str, default = [],
+                    help = "Preprocessor defines")
+parser.add_argument("extras", nargs = 1,
+                    help = "Path to the header file")
+args = parser.parse_args()
+
 from clang.cindex import Index, CursorKind, TypeKind
 
 kind_decl_map = {
@@ -96,7 +111,7 @@ def get_constants_from_enum(decl):
   return constants
 
 
-def emit_inline_typedef_with_body(cursor):
+def emit_inline_typedef_with_body(cursor, args):
   if cursor.kind != CursorKind.TYPEDEF_DECL:
     return None
 
@@ -133,7 +148,7 @@ def emit_inline_typedef_with_body(cursor):
 #  else:
 #    return f"typedef {kind_str} {{\n{body}\n}} {typedef_name};"
 
-def emit_typedef(cursor):
+def emit_typedef(cursor, args):
   if cursor.kind != CursorKind.TYPEDEF_DECL:
     return None
 
@@ -148,7 +163,8 @@ def emit_typedef(cursor):
   }:
     return f"typedef {t.spelling} {typedef_name};"
 
-  print("/* " + str(t.kind) + " " + str(t.get_pointee().kind) + " */")
+  if args.verbose:
+    print("/* " + str(t.kind) + " " + str(t.get_pointee().kind) + " */")
 
   # Pointer to struct
   if t.kind == TypeKind.POINTER:
@@ -187,19 +203,19 @@ def emit_typedef(cursor):
     size = t.element_count
     return f"typedef {element_type} {typedef_name}[{size}];"
 
-  str_typedef_with_body = emit_inline_typedef_with_body(cursor)
+  str_typedef_with_body = emit_inline_typedef_with_body(cursor, args)
   if str_typedef_with_body:
-    return str_typedef_with_body
+    return "\n" + str_typedef_with_body + "\n"
 
   return None
 
-def emit_struct_union_enum_decl(cursor, anon_union_counter = 0):
+def emit_struct_union_enum_decl(cursor, args, anon_union_counter = 0):
   if cursor.kind not in { CursorKind.STRUCT_DECL, CursorKind.UNION_DECL, CursorKind.ENUM_DECL }:
     return None
 
   if has_typedef_sibling(cursor):
-    print(f"/* has sibling, do not emit now */")
-    pass
+    if args.verbose:
+      print(f"/* has sibling, do not emit now */")
   elif cursor.kind == CursorKind.STRUCT_DECL:
     fields = get_fields_from_struct_or_union(cursor, indent = "  ")
     body = "\n".join(fields)
@@ -224,7 +240,7 @@ def emit_struct_union_enum_decl(cursor, anon_union_counter = 0):
   else:
     return None
 
-def emit_function_decl(cursor):
+def emit_function_decl(cursor, args):
   if cursor.kind != CursorKind.FUNCTION_DECL:
     return None
 
@@ -241,30 +257,31 @@ def emit_function_decl(cursor):
   return f"{return_type} {func_name}({param_str});"
 
 index = Index.create()
-tu = index.parse("test-variable.h", args = [
-  "-I/opt/homebrew/opt/freetype/include/freetype2",
-  "-I/opt/homebrew/opt/libpng/include/libpng16"
+tu = index.parse(args.extras[0], args = [
+  ("-I" + dir) for dir in args.include_dirs
+] + [
+  ("-D" + macro) for macro in args.defines
 ])
 
 for cursor in tu.cursor.get_children():
   if cursor.kind.is_declaration():
-    print("/* " + str(cursor.spelling) + " " + str(cursor.kind) + " */")
+    if args.verbose:
+      print("/* " + str(cursor.spelling) + " " + str(cursor.kind) + " */")
 
   if cursor.kind == CursorKind.TYPEDEF_DECL:
-    typedef = emit_typedef(cursor)
+    typedef = emit_typedef(cursor, args)
     if typedef:
       print(typedef)
   elif cursor.kind in { CursorKind.STRUCT_DECL, CursorKind.UNION_DECL, CursorKind.ENUM_DECL }:
     if not cursor.is_definition():
-      print(f"/* {cursor.spelling} is not a definition */")
+      if args.verbose:
+        print(f"/* {cursor.spelling} is not a definition */")
       continue
 
-    str_decl = emit_struct_union_enum_decl(cursor)
+    str_decl = emit_struct_union_enum_decl(cursor, args)
     if str_decl:
-      print(str_decl)
+      print("\n" + str_decl + "\n")
   elif cursor.kind == CursorKind.FUNCTION_DECL:
-    str_decl = emit_function_decl(cursor)
+    str_decl = emit_function_decl(cursor, args)
     if str_decl:
       print(str_decl)
-
-  print("")
