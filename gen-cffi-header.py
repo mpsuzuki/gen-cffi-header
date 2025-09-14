@@ -2,6 +2,32 @@
 
 from clang.cindex import Index, CursorKind, TypeKind
 
+kind_decl_map = {
+  CursorKind.UNEXPOSED_DECL: "unexposed",
+  CursorKind.STRUCT_DECL: "struct",
+  CursorKind.UNION_DECL: "union",
+  CursorKind.CLASS_DECL: "class",
+  CursorKind.ENUM_DECL: "enum",
+  CursorKind.ENUM_CONSTANT_DECL: "enum_const",
+  CursorKind.FUNCTION_DECL: "function",
+  CursorKind.VAR_DECL: "var",
+  CursorKind.PARM_DECL: "parm",
+  CursorKind.TYPE_ALIAS_DECL: "type_alias",
+  CursorKind.TYPEDEF_DECL: "typedef",
+  CursorKind.CONCEPT_DECL: "concept",
+  # CursorKind.USING_DECL: "using",
+
+  # CursorKind.OBJ_C_INTERFACE_DECL: "interface",
+  # CursorKind.OBJ_C_CATEGORY_DECL: "category",
+  # CursorKind.OBJ_C_PROTOCOL_DECL: "protocol",
+  # CursorKind.OBJ_C_PROPERTY_DECL: "property",
+  # CursorKind.OBJ_C_IVAR_DECL: "ivar",
+  # CursorKind.OBJ_C_INSTANCE_METHOD_DECL: "instance_method",
+  # CursorKind.OBJ_C_CLASS_METHOD_DECL: "class_method",
+  # CursorKind.OBJ_C_IMPLEMENTATION_DECL: "implementation",
+  # CursorKind.OBJ_C_CATEGORY_IMPL_DECL: "category_impl",
+}
+
 def normalize_spaces(s):
   return " ".join(s.split())
 
@@ -67,15 +93,7 @@ def emit_inline_typedef_with_body(cursor):
 
   if not decl.is_definition():
     return None
-  elif decl.kind == CursorKind.UNION_DECL:
-    kind_str = "union"
-  elif decl.kind == CursorKind.STRUCT_DECL:
-    kind_str = "struct"
-  elif decl.kind == CursorKind.ENUM_DECL:
-    kind_str = "enum"
-  else:
-    # kind_str = "record"
-    return None
+  kind_str = kind_decl_map.get(decl.kind, "unknown")
 
   if kind_str in {"struct", "union"}:
     fields = get_fields_from_struct_or_union(decl)
@@ -83,6 +101,8 @@ def emit_inline_typedef_with_body(cursor):
   elif kind_str == "enum":
     constants = get_constants_from_enum(decl)
     body = "\n".join(constants)
+  else:
+    return None
   return f"typedef {kind_str} {{\n{body}\n}} {typedef_name};"
 #  if tag_name:
 #    return (
