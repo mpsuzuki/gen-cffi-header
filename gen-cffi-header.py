@@ -62,10 +62,10 @@ def get_fields_from_struct_or_union(decl, indent = "  ", anon_counter = [1]):
     if child.kind == CursorKind.FIELD_DECL:
       field_type = child.type
       field_name = child.spelling
-      fields.append(f"{indent}{field_type.spelling} {field_name};{loc_info}")
+      fields.append(f"{indent}{field_type.spelling} {field_name};")
     elif child.kind in {CursorKind.STRUCT_DECL, CursorKind.UNION_DECL}:
       if has_valid_spelling(child.type) and has_valid_spelling(child):
-        fields.append(f"{indent}{child.type.spelling} {child.spelling};{loc_info}")
+        fields.append(f"{indent}{child.type.spelling} {child.spelling};")
       else:
         kind_str   = kind_decl_map.get(child.kind, "unknown")
         type_name  = f"__anon_{kind_str}_{anon_counter[0]}"
