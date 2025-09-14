@@ -47,13 +47,34 @@ def has_typedef_sibling(cursor):
         return True
   return False
 
-def get_fields_from_struct_or_union(decl):
+def has_valid_spelling(cursor):
+  return (len(cursor.spelling.split()) == 1)
+
+def get_fields_from_struct_or_union(decl, indent = "  ", anon_counter = [1]):
   fields = []
-  for field in decl.get_children():
-    if field.kind == CursorKind.FIELD_DECL:
-      field_type = field.type.spelling
-      field_name = field.spelling
-      fields.append(f"    {field_type} {field_name};")
+  for child in decl.get_children():
+    loc = child.location
+    if loc and loc.file:
+      loc_info = f" // from {loc.file.name}:{loc.line}:{loc.column}"
+    else:
+      loc_info = ""
+
+    if child.kind == CursorKind.FIELD_DECL:
+      field_type = child.type
+      field_name = child.spelling
+      fields.append(f"{indent}{field_type.spelling} {field_name};{loc_info}")
+    elif child.kind in {CursorKind.STRUCT_DECL, CursorKind.UNION_DECL}:
+      if has_valid_spelling(child.type) and has_valid_spelling(child):
+        fields.append(f"{indent}{child.type.spelling} {child.spelling};{loc_info}")
+      else:
+        kind_str   = kind_decl_map.get(child.kind, "unknown")
+        type_name  = f"__anon_{kind_str}_{anon_counter[0]}"
+        field_name = f"__anon_{kind_str}_{anon_counter[0]}_value"
+        anon_counter[0] += 1
+
+        subfields = get_fields_from_struct_or_union(child, indent + indent, anon_counter)
+        body = "\n".join(subfields)
+        fields.append(f"{indent}{kind_str} {type_name} {{{loc_info}\n{body}\n{indent}}} {field_name};")
   return fields
 
 def get_constants_from_enum(decl):
