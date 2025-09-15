@@ -145,14 +145,14 @@ def emit_inline_typedef_with_body(cursor, args):
     body = "\n".join(constants)
   else:
     return None
-  return f"typedef {kind_str} {{\n{body}\n}} {typedef_name};"
-#  if tag_name:
-#    return (
-#      f"{kind_str} {tag_name} {{\n{body}\n}};\n"
-#      f"typedef {kind_str} {tag_name} {typedef_name};"
-#    )
-#  else:
-#    return f"typedef {kind_str} {{\n{body}\n}} {typedef_name};"
+#  return f"typedef {kind_str} {{\n{body}\n}} {typedef_name};"
+  if tag_name:
+    return (
+      f"{kind_str} {tag_name} {{\n{body}\n}};\n"
+      f"typedef {kind_str} {tag_name} {typedef_name};"
+    )
+  else:
+    return f"typedef {kind_str} {{\n{body}\n}} {typedef_name};"
 
 def emit_typedef(cursor, args):
   if cursor.kind != CursorKind.TYPEDEF_DECL:
