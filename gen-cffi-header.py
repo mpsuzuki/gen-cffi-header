@@ -159,7 +159,7 @@ def emit_typedef(cursor, args):
   if normalize_spaces(t.spelling) in {
     "unsigned char", "unsigned short", "unsigned int", "unsigned long",
     "char", "short", "int", "long",
-    "float", "double", "void"
+    "float", "double", "void", "void *",
   }:
     return f"typedef {t.spelling} {typedef_name};"
 
