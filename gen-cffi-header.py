@@ -12,10 +12,6 @@ parser.add_argument("-I", dest = "include_dirs",
 parser.add_argument("-D", dest = "defines",
                     action = "append", type = str, default = [],
                     help = "Preprocessor defines")
-parser.add_argument("--cpp", type = str, default = "gcc -E -dD",
-                    help = "Genuine preprocessor command (default 'gcc -E'")
-parser.add_argument("--save-temps", action = "store_true",
-                    help = "Keep temporary files (remove by default)")
 parser.add_argument("extras", nargs = 1,
                     help = "Path to the header file")
 args = parser.parse_args()
@@ -365,32 +361,3 @@ for cursor in header_ast.cursor.get_children():
     str_decl = emit_function_decl(cursor, args)
     if str_decl:
       print(str_decl)
-
-#if len(todo_macros) == 0:
-#  exit(0)
-#
-#import subprocess
-#cpp_cmd = args.cpp.split() + [
-#  ("-D" + macro) for macro in args.defines
-#] + [
-#  ("-I" + dir) for dir in args.include_dirs
-#] + args.extras[:1]
-#print(cpp_cmd)
-#cpp_result = subprocess.run(cpp_cmd, capture_output = True, text = True)
-#
-#import tempfile
-#with tempfile.NamedTemporaryFile(mode = "w+", suffix = ".i", delete = not(args.save_temps)) as fh_cpp:
-#  fh_cpp.write(cpp_result.stdout)
-#  header_pp_ast = index.parse(fh_cpp.name, options = TranslationUnit.PARSE_DETAILED_PROCESSING_RECORD)
-#
-#  print(header_pp_ast)
-#  for cursor in header_pp_ast.cursor.get_children():
-#    print("\n/* " + str(cursor.spelling) + " " + str(cursor.kind) + " */")
-#    if cursor.kind == CursorKind.MACRO_DEFINITION:
-#      if cursor.spelling in todo_macros:
-#        is_primitive, macro_name, macro_value = process_macro_definition(cursor)
-#        if is_primitive:
-#          print(f"#define {macro_name} {macro_value}")
-#        else:
-#          if args.verbose:
-#            print(f"/* {macro_name} is not primitive, enque it for genuine cpp resolver */")
