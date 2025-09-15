@@ -77,7 +77,13 @@ def get_fields_from_struct_or_union(decl, indent = "  ", anon_counter = [1]):
     if child.kind == CursorKind.FIELD_DECL:
       field_type = child.type
       field_name = child.spelling
-      fields.append(f"{indent}{field_type.spelling} {field_name};")
+
+      if field_type.kind == TypeKind.CONSTANTARRAY:
+        elem_type  = field_type.element_type.spelling
+        array_size = field_type.element_count
+        fields.append(f"{indent}{elem_type} {field_name}[{array_size}];")
+      else:
+        fields.append(f"{indent}{field_type.spelling} {field_name};")
     elif child.kind in {CursorKind.STRUCT_DECL, CursorKind.UNION_DECL}:
       if has_valid_spelling(child.type) and has_valid_spelling(child):
         fields.append(f"{indent}{child.type.spelling} {child.spelling};")
