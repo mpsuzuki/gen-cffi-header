@@ -263,13 +263,13 @@ def emit_function_decl(cursor, args):
   return f"{return_type} {func_name}({param_str});"
 
 index = Index.create()
-tu = index.parse(args.extras[0], args = [
-  ("-I" + dir) for dir in args.include_dirs
-] + [
+header_ast = index.parse(args.extras[0], args = [
   ("-D" + macro) for macro in args.defines
+] + [
+  ("-I" + dir) for dir in args.include_dirs
 ])
 
-for cursor in tu.cursor.get_children():
+for cursor in header_ast.cursor.get_children():
   if cursor.kind.is_declaration():
     if args.verbose:
       print("/* " + str(cursor.spelling) + " " + str(cursor.kind) + " */")
