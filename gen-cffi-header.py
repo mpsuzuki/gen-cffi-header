@@ -2,6 +2,7 @@
 
 import argparse
 import sys
+
 parser = argparse.ArgumentParser(add_help = True)
 parser.add_argument("--verbose", "-v", action = "store_true",
                     help = "verbose mode")
