@@ -293,7 +293,7 @@ print(header_pp_ast)
 for cursor in header_ast.cursor.get_children():
   if cursor.kind.is_declaration():
     if args.verbose:
-      print("/* " + str(cursor.spelling) + " " + str(cursor.kind) + " */")
+      print("\n/* " + str(cursor.spelling) + " " + str(cursor.kind) + " */")
 
   if cursor.kind == CursorKind.TYPEDEF_DECL:
     typedef = emit_typedef(cursor, args)
