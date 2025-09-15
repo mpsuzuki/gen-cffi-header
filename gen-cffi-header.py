@@ -11,6 +11,10 @@ parser.add_argument("-I", dest = "include_dirs",
 parser.add_argument("-D", dest = "defines",
                     action = "append", type = str, default = [],
                     help = "Preprocessor defines")
+parser.add_argument("--cpp", type = str, default = "gcc -E",
+                    help = "Genuine preprocessor command (default 'gcc -E'")
+parser.add_argument("--save-temps", action = "store_true",
+                    help = "Keep temporary files (remove by default)")
 parser.add_argument("extras", nargs = 1,
                     help = "Path to the header file")
 args = parser.parse_args()
@@ -262,12 +266,29 @@ def emit_function_decl(cursor, args):
   param_str = ", ".join(params)
   return f"{return_type} {func_name}({param_str});"
 
+import subprocess
+cpp_cmd = args.cpp.split() + [
+  ("-D" + macro) for macro in args.defines
+] + [
+  ("-I" + dir) for dir in args.include_dirs
+] + [
+  args.extras[0]
+]
+
 index = Index.create()
 header_ast = index.parse(args.extras[0], args = [
   ("-D" + macro) for macro in args.defines
 ] + [
   ("-I" + dir) for dir in args.include_dirs
 ])
+
+cpp_result = subprocess.run(cpp_cmd, capture_output = True, text = True)
+import tempfile
+with tempfile.NamedTemporaryFile(mode = "w+", suffix = ".i", delete = not(args.save_temps)) as fh_cpp:
+  fh_cpp.write(cpp_result.stdout)
+  header_pp_ast = index.parse(fh_cpp.name)
+
+print(header_pp_ast)
 
 for cursor in header_ast.cursor.get_children():
   if cursor.kind.is_declaration():
