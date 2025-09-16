@@ -27,6 +27,8 @@ parser.add_argument("--once", action = "store_true",
                     help = "Do not scan 2nd pass (twice by default)")
 parser.add_argument("--save-temps", action = "store_true",
                     help = "Keep temporary files (remove by default)")
+parser.add_argument("--debug", action = "store_true",
+                    help = "Debug")
 parser.add_argument("extras", nargs = 1,
                     help = "Path to the header file")
 args = parser.parse_args()
@@ -481,6 +483,11 @@ if len(todo_macros) > 0 and not args.once:
     walk(macros_ast.cursor, "")
 
 for itm in output_items:
+  if args.debug:
+    body_escaped = itm.body.replace("\n", "\\n")
+    print(f"{itm.kind}:\t\"{body_escaped}\"")
+    continue
+
   if itm.kind == "verbose":
     if args.verbose:
       print(itm.body)
