@@ -2,6 +2,16 @@
 
 import argparse
 import sys
+import re
+import os
+
+regex_numeric = re.compile(
+  r"^(0[xX][0-9a-fA-F]+|0[0-7]+|[1-9][0-9]*|0)[uU]{0,2}[lL]{0,2}$",
+  re.VERBOSE
+)
+
+def is_oct_dec_hex(s):
+  return bool(regex_numeric.match(s.strip()))
 
 parser = argparse.ArgumentParser(add_help = True)
 parser.add_argument("--verbose", "-v", action = "store_true",
@@ -298,19 +308,19 @@ def process_macro_definition(cursor):
   macro_name = cursor.spelling
   tokens = list(cursor.get_tokens())
 
-  for i, t in enumerate(tokens):
-    if t.spelling == macro_name and i + 1 < len(tokens):
-      if tokens[i + 1].spelling == "(":
-        return False, macro_name, None
-      break
-
   if len(tokens) == 1:
-    return True, macro_name, None
+    return False, macro_name, None
+
+  if len(tokens) == 2 and tokens[0].spelling == macro_name and is_oct_dec_hex(tokens[1].spelling):
+    return True, macro_name, tokens[1].spelling
 
   value_tokens = tokens[1:]
-  macro_value = "".join(t.spelling for t in value_tokens)
+  if value_tokens[0].spelling == "<": # FreeType defines pathname for header location by <...>
+    macro_value = "".join(t.spelling for t in value_tokens)
+  else:
+    macro_value = " ".join(t.spelling for t in value_tokens)
 
-  return True, macro_name, macro_value
+  return False, macro_name, macro_value
 
 todo_macros = []
 
