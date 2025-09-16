@@ -497,7 +497,7 @@ for itm in output_items:
     print(f"{itm.kind}:\t\"{body_escaped}\"")
     continue
 
-  if itm.kind == "verbose":
+  if itm.kind in ["verbose", "macro_non_primitive", "macro_empty" ]:
     if args.verbose:
       print(itm.body)
   else:
