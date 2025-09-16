@@ -313,13 +313,19 @@ def path_to_c_identifier(path, count = 2):
 
 class AttrDict:
   def __init__(self, d = {}):
-    self.__dict__ = d
+    self._data = d
 
   def __getattr__(self, k):
-    return self.__dict__.get(k, None)
+    return self._data.get(k, None)
 
   def __setattr__(self, k, v):
-    self.__dict__[k] = v
+    if k == "_data":
+      super().__setattr__(k, v)
+    else:
+      self._data[k] = v
+
+  def keys(self):
+    return self._data.keys()
 
 output_items = []
 def append_output(s, k):
