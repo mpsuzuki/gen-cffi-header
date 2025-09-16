@@ -282,7 +282,6 @@ from pathlib import Path
 target_header = Path(args.extras[0]).resolve()
 include_dirs = [Path(d).resolve() for d in args.include_dirs]
 user_macros = [d.split("=", 1)[0].strip() for d in args.defines]
-dict_c_identifier = {}
 def is_subpath(str_child, str_parent):
   try:
     path_child = Path(str_child).resolve()
@@ -351,8 +350,6 @@ def process_macro_definition(cursor):
       "column": loc.column
     })
     macro.location_cstr = f"{c_path}_L{loc.line}_C{loc.column}"
-    dict_c_identifier[loc.file.name] = c_path
-    dict_c_identifier[c_path] = loc.file.name
 
   macro.name = cursor.spelling
   tokens = list(cursor.get_tokens())
