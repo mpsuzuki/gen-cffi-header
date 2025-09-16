@@ -23,6 +23,8 @@ parser.add_argument("-I", dest = "include_dirs",
 parser.add_argument("-D", dest = "defines",
                     action = "append", type = str, default = [],
                     help = "Preprocessor defines")
+parser.add_argument("--once", action = "store_true",
+                    help = "Do not scan 2nd pass (twice by default)")
 parser.add_argument("--save-temps", action = "store_true",
                     help = "Keep temporary files (remove by default)")
 parser.add_argument("extras", nargs = 1,
@@ -455,7 +457,7 @@ def walk(cursor, indent):
 
     walk(c, indent + "  ")
 
-if len(todo_macros) > 0:
+if len(todo_macros) > 0 and not args.once:
   import tempfile
   with tempfile.NamedTemporaryFile( mode = "w+",
                                     suffix = ".h",
