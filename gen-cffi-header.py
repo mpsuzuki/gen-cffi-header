@@ -428,7 +428,17 @@ for fp_tmp in glob.glob(pat_tmpfiles):
 def walk(cursor, indent):
   for c in cursor.get_children():
     if c.kind == CursorKind.ENUM_CONSTANT_DECL and c.enum_value:
+      if not c.spelling.startswith("__"):
+        # print(f"Ignore {c.spelling} which is not registered in 2nd-pass Resolver")
+        continue
+
       macro_name = re.sub(r"^__", "", c.spelling)
+      if not macro_name in todo_macros:
+        # print(f"Ignore {macro_name} which is not registered in todo_macros")
+        continue
+
+      # print(f"Resolve {macro_name}")
+
       if c.enum_value < 0x10:
         macro_define = f"{indent}#define {macro_name}\t{c.enum_value}"
       elif c.enum_value < 0x100:
@@ -440,15 +450,12 @@ def walk(cursor, indent):
       else:
         macro_define = f"{indent}#define {macro_name}\t0x{c.enum_value:X}"
 
-#      if macro_name in todo_macros:
-#        todo_macros[macro_name].body = macro_define
-#        todo_macros[macro_name].kind = "macro_defined"
+      todo_macros[macro_name].body = macro_define
+      todo_macros[macro_name].kind = "macro_defined"
 
     walk(c, indent + "  ")
 
 if len(todo_macros) > 0:
-  #for macro_name, itm in todo_macros.items():
-  #  print(f"/* {macro_name}, {itm.body}, {itm.kind} */")
   import tempfile
   with tempfile.NamedTemporaryFile( mode = "w+",
                                     suffix = ".h",
