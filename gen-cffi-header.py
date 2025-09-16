@@ -228,7 +228,7 @@ def emit_typedef(cursor, args):
 
   str_typedef_with_body = emit_inline_typedef_with_body(cursor, args)
   if str_typedef_with_body:
-    return "\n" + str_typedef_with_body + "\n"
+    return str_typedef_with_body
 
   return None
 
@@ -384,7 +384,7 @@ header_ast = index.parse(args.extras[0], args = [
 
 
 for cursor in header_ast.cursor.get_children():
-  append_output("\n/* " + str(cursor.spelling) + " " + str(cursor.kind) + " */", "verbose")
+  append_output("/* " + str(cursor.spelling) + " " + str(cursor.kind) + " */", "verbose")
 
   if cursor.kind == CursorKind.MACRO_DEFINITION:
     if is_system_macro(cursor):
@@ -392,7 +392,11 @@ for cursor in header_ast.cursor.get_children():
 
     m = process_macro_definition(cursor)
     if m.is_primitive and m.value:
-      append_output(f"#define {m.name} {m.value}", "macro_defined")
+      macro_defines = [
+        f"/* {m.location.path}:{m.location.line} */",
+        f"#define {m.name} {m.value}"
+      ]
+      append_output("\n".join(macro_defines), "macro_defined")
     else:
       if m.value:
         append_output(f"/* {m.name} is not primitive */", "macro_non_primitive")
@@ -415,7 +419,7 @@ for cursor in header_ast.cursor.get_children():
 
     str_decl = emit_struct_union_enum_decl(cursor, args)
     if str_decl:
-      append_output("\n" + str_decl + "\n", "struct_union_enum")
+      append_output(str_decl + "\n", "struct_union_enum")
   elif cursor.kind == CursorKind.FUNCTION_DECL:
     str_decl = emit_function_decl(cursor, args)
     if str_decl:
@@ -443,18 +447,23 @@ def walk(cursor, indent):
 
       # print(f"Resolve {macro_name}")
 
-      if c.enum_value < 0x10:
-        macro_define = f"{indent}#define {macro_name}\t{c.enum_value}"
-      elif c.enum_value < 0x100:
-        macro_define = f"{indent}#define {macro_name}\t0x{c.enum_value:02X}"
-      elif c.enum_value < 0x10000:
-        macro_define = f"{indent}#define {macro_name}\t0x{c.enum_value:04X}"
-      elif c.enum_value <= 0xFFFFFFFF:
-        macro_define = f"{indent}#define {macro_name}\t0x{c.enum_value:08X}"
-      else:
-        macro_define = f"{indent}#define {macro_name}\t0x{c.enum_value:X}"
+      m = todo_macros[macro_name].macro
+      macro_defines = [
+        f"/* {m.location.path}:{m.location.line} */"
+      ]
 
-      todo_macros[macro_name].body = macro_define
+      if c.enum_value < 0x10:
+        macro_defines.append(f"#define {macro_name}\t{c.enum_value}")
+      elif c.enum_value < 0x100:
+        macro_defines.append(f"#define {macro_name}\t0x{c.enum_value:02X}")
+      elif c.enum_value < 0x10000:
+        macro_defines.append(f"#define {macro_name}\t0x{c.enum_value:04X}")
+      elif c.enum_value <= 0xFFFFFFFF:
+        macro_defines.append(f"#define {macro_name}\t0x{c.enum_value:08X}")
+      else:
+        macro_defines.append(f"#define {macro_name}\t0x{c.enum_value:X}")
+
+      todo_macros[macro_name].body = "\n".join(macro_defines)
       todo_macros[macro_name].kind = "macro_defined"
 
     walk(c, indent + "  ")
