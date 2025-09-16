@@ -4,6 +4,7 @@ import argparse
 import sys
 import re
 import os
+import glob
 
 regex_numeric = re.compile(
   r"^(0[xX][0-9a-fA-F]+|0[0-7]+|[1-9][0-9]*|0)[uU]{0,2}[lL]{0,2}$",
@@ -22,6 +23,8 @@ parser.add_argument("-I", dest = "include_dirs",
 parser.add_argument("-D", dest = "defines",
                     action = "append", type = str, default = [],
                     help = "Preprocessor defines")
+parser.add_argument("--save-temps", action = "store_true",
+                    help = "Keep temporary files (remove by default)")
 parser.add_argument("extras", nargs = 1,
                     help = "Path to the header file")
 args = parser.parse_args()
@@ -384,3 +387,49 @@ for cursor in header_ast.cursor.get_children():
     str_decl = emit_function_decl(cursor, args)
     if str_decl:
       print(str_decl)
+
+pat_tmpfiles = os.path.join(os.getcwd(), "macro_eval_*")
+for fp_tmp in glob.glob(pat_tmpfiles):
+  try:
+    os.remove(fp_tmp)
+    print(f"Deleted {fp_tmp}", file = sys.stderr)
+  except Exception as e:
+    print(f"Failed to delete {fp_tmp}: {e}", file = sys.stderr)
+
+if len(todo_macros) == 0:
+  exit(0)
+
+def walk(cursor, indent):
+  for c in cursor.get_children():
+    if c.kind == CursorKind.ENUM_CONSTANT_DECL and c.enum_value:
+      if c.enum_value < 0x10:
+        print(f"{indent}#define {c.spelling}\t{c.enum_value}")
+      elif c.enum_value < 0x100:
+        print(f"{indent}#define {c.spelling}\t0x{c.enum_value:02X}")
+      elif c.enum_value < 0x10000:
+        print(f"{indent}#define {c.spelling}\t0x{c.enum_value:04X}")
+      elif c.enum_value <= 0xFFFFFFFF:
+        print(f"{indent}#define {c.spelling}\t0x{c.enum_value:08X}")
+      else:
+        print(f"{indent}#define {c.spelling}\t0x{c.enum_value:X}")
+    walk(c, indent + "  ")
+
+import tempfile
+with tempfile.NamedTemporaryFile( mode = "w+",
+                                  suffix = ".h",
+                                  dir = os.getcwd(),
+                                  prefix = "macro_eval_",
+                                  delete = False # not(args.save_temps)
+                                ) as fh_tmp:
+  print(fh_tmp.name)
+  print(f"#include \"{target_header}\"", file = fh_tmp)
+  for macro_name, macro_value, macro_loc in todo_macros:
+    print(f"enum __anon_{macro_name}_{macro_loc} {{__{macro_name} = {macro_value}}};", file = fh_tmp)
+
+  macros_ast = index.parse(fh_tmp.name, args = [
+    ("-D" + macro) for macro in args.defines
+  ] + ["-I ."] + [
+    ("-I" + dir) for dir in args.include_dirs
+  ], options = TranslationUnit.PARSE_DETAILED_PROCESSING_RECORD)
+
+  walk(macros_ast.cursor, "")
