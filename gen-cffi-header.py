@@ -311,7 +311,7 @@ def path_to_c_identifier(path, count = 2):
   path = "_".join(Path(path).parts[(0 - count):])
   return re.sub(r"[^a-zA-Z0-9_]", "_", path)
 
-class EasyDict:
+class AttrDict:
   def __init__(self, d = {}):
     self.__dict__ = d
 
@@ -323,19 +323,19 @@ class EasyDict:
 
 output_items = []
 def append_output(s, k):
-  itm = EasyDict({})
+  itm = AttrDict({})
   itm.body = s
   itm.kind = k
   output_items.append(itm)
 
 def process_macro_definition(cursor):
-  macro = EasyDict()
+  macro = AttrDict()
   macro.is_primitive = False
 
   loc = cursor.location
   if loc.file:
     c_path = path_to_c_identifier(loc.file.name)
-    macro.location = EasyDict({
+    macro.location = AttrDict({
       "path": loc.file.name,
       "line": loc.line,
       "column": loc.column
