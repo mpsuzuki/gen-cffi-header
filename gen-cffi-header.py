@@ -500,7 +500,7 @@ if len(todo_macros) > 0 and not args.once:
 
     walk(macros_ast.cursor, "")
 
-last_kind = None
+prev_kind = None
 for itm in output_items:
   if args.debug:
     body_escaped = itm.body.replace("\n", "\\n")
@@ -513,11 +513,11 @@ for itm in output_items:
     continue
 
   kind = itm.kind.split("_")[0]
-  # print(last_kind, kind)
+  # print(prev_kind, kind)
   if kind == "typedef-multi":
     print("")
-  elif last_kind and last_kind != kind:
+  elif prev_kind and prev_kind != kind:
     print("")
-  last_kind = kind
+  prev_kind = kind
 
   print(itm.body)
