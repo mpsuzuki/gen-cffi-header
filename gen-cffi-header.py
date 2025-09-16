@@ -476,7 +476,7 @@ if len(todo_macros) > 0 and not args.once:
                                     prefix = "macro_eval_",
                                     delete = False # not(args.save_temps)
                                   ) as fh_tmp:
-    print(fh_tmp.name)
+    print(fh_tmp.name, file = sys.stderr)
     print(f"#include \"{target_header}\"", file = fh_tmp)
     for macro_name, itm in todo_macros.items():
       m = itm.macro
