@@ -313,32 +313,50 @@ def path_to_c_identifier(path, count = 2):
   path = "_".join(Path(path).parts[(0 - count):])
   return re.sub(r"[^a-zA-Z0-9_]", "_", path)
 
+class EasyDict:
+  def __init__(self, d = {}):
+    self.__dict__ = d
+
+  def __getattr__(self, k):
+    return self.__dict__.get(k, None)
+
+  def __setattr__(self, k, v):
+    self.__dict__[k] = v
+
 def process_macro_definition(cursor):
-  macro_loc = None
+  macro = EasyDict()
+  macro.is_primitive = False
+
   loc = cursor.location
   if loc.file:
     c_path = path_to_c_identifier(loc.file.name)
-    print(loc.file.name, c_path)
-    macro_loc = f"{c_path}_L{loc.line}_C{loc.column}"
+    macro.location = EasyDict({
+      "path": loc.file.name,
+      "line": loc.line,
+      "column": loc.column
+    })
+    macro.location_cstr = f"{c_path}_L{loc.line}_C{loc.column}"
     dict_c_identifier[loc.file.name] = c_path
     dict_c_identifier[c_path] = loc.file.name
 
-  macro_name = cursor.spelling
+  macro.name = cursor.spelling
   tokens = list(cursor.get_tokens())
 
   if len(tokens) == 1:
-    return False, macro_name, None, macro_loc
+    return macro
 
-  if len(tokens) == 2 and tokens[0].spelling == macro_name and is_oct_dec_hex(tokens[1].spelling):
-    return True, macro_name, tokens[1].spelling, macro_loc
+  if len(tokens) == 2 and tokens[0].spelling == macro.name and is_oct_dec_hex(tokens[1].spelling):
+    macro.value = tokens[1]
+    macro.is_primitive = True
+    return macro
 
   value_tokens = tokens[1:]
   if value_tokens[0].spelling == "<": # FreeType defines pathname for header location by <...>
-    macro_value = "".join(t.spelling for t in value_tokens)
+    macro.value = "".join(t.spelling for t in value_tokens)
   else:
-    macro_value = " ".join(t.spelling for t in value_tokens)
+    macro.value = " ".join(t.spelling for t in value_tokens)
 
-  return False, macro_name, macro_value, macro_loc
+  return macro
 
 todo_macros = []
 
@@ -358,14 +376,14 @@ for cursor in header_ast.cursor.get_children():
     if is_system_macro(cursor):
       continue
 
-    is_primitive, macro_name, macro_value, macro_loc = process_macro_definition(cursor)
-    if is_primitive and macro_value:
-      print(f"#define {macro_name} {macro_value}")
+    m = process_macro_definition(cursor)
+    if m.is_primitive and m.value:
+      print(f"#define {m.name} {m.value}")
     else:
       if args.verbose:
-        print(f"/* {macro_name} is not primitive */")
-      if macro_value:
-        todo_macros.append((macro_name, macro_value, macro_loc))
+        print(f"/* {m.name} is not primitive */")
+      if m.value:
+        todo_macros.append(m)
 
   # elif cursor.kind == CursorKind.VAR_DECL:
   #   TODO
@@ -423,8 +441,8 @@ with tempfile.NamedTemporaryFile( mode = "w+",
                                 ) as fh_tmp:
   print(fh_tmp.name)
   print(f"#include \"{target_header}\"", file = fh_tmp)
-  for macro_name, macro_value, macro_loc in todo_macros:
-    print(f"enum __anon_{macro_name}_{macro_loc} {{__{macro_name} = {macro_value}}};", file = fh_tmp)
+  for m in todo_macros:
+    print(f"enum __anon_{m.name}_{m.location_cstr} {{__{m.name} = {m.value}}};", file = fh_tmp)
 
   macros_ast = index.parse(fh_tmp.name, args = [
     ("-D" + macro) for macro in args.defines
