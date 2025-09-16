@@ -312,8 +312,8 @@ def path_to_c_identifier(path, count = 2):
   return re.sub(r"[^a-zA-Z0-9_]", "_", path)
 
 class AttrDict:
-  def __init__(self, d = {}):
-    self._data = d
+  def __init__(self, d = None):
+    self._data = dict(d) if d is not None else {}
 
   def __getattr__(self, k):
     return self._data.get(k, None)
