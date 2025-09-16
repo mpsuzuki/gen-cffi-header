@@ -314,6 +314,14 @@ def path_to_c_identifier(path, count = 2):
   path = "_".join(Path(path).parts[(0 - count):])
   return re.sub(r"[^a-zA-Z0-9_]", "_", path)
 
+def get_relative_path_from_include_dirs(fp):
+  _fp = str(Path(fp).resolve())
+  for d in include_dirs:
+    _d = str(Path(d).resolve())
+    if _fp.startswith(_d):
+      return _fp.removeprefix(_d)[1:]
+  return fp
+
 class AttrDict:
   def __init__(self, d = None):
     self._data = dict(d) if d is not None else {}
@@ -345,7 +353,7 @@ def process_macro_definition(cursor):
   if loc.file:
     c_path = path_to_c_identifier(loc.file.name)
     macro.location = AttrDict({
-      "path": loc.file.name,
+      "path": '"' + get_relative_path_from_include_dirs(loc.file.name) + '"',
       "line": loc.line,
       "column": loc.column
     })
