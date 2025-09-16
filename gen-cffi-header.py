@@ -399,7 +399,7 @@ for cursor in header_ast.cursor.get_children():
       append_output("\n".join(macro_defines), "macro_defined")
     else:
       if m.value:
-        append_output(f"/* {m.name} is not primitive */", "macro_non_primitive")
+        append_output(f"/* {m.name} is not primitive */", "macro_non-primitive")
         todo_macros[m.name] = output_items[-1]
         todo_macros[m.name].macro = m
       else:
@@ -409,9 +409,13 @@ for cursor in header_ast.cursor.get_children():
   #   TODO
 
   elif cursor.kind == CursorKind.TYPEDEF_DECL:
-    typedef = emit_typedef(cursor, args)
-    if typedef:
-      append_output(typedef, "typedef")
+    str_typedef = emit_typedef(cursor, args)
+    if str_typedef is None:
+      continue
+    elif str_typedef.count("\n") > 0:
+      append_output(str_typedef, "typedef-multi")
+    else:
+      append_output(str_typedef, "typedef")
   elif cursor.kind in { CursorKind.STRUCT_DECL, CursorKind.UNION_DECL, CursorKind.ENUM_DECL }:
     if not cursor.is_definition():
       append_output(f"/* {cursor.spelling} is not a definition */", "verbose")
@@ -419,7 +423,7 @@ for cursor in header_ast.cursor.get_children():
 
     str_decl = emit_struct_union_enum_decl(cursor, args)
     if str_decl:
-      append_output(str_decl + "\n", "struct_union_enum")
+      append_output(str_decl, kind_decl_map.get(cursor.kind, "unknown"))
   elif cursor.kind == CursorKind.FUNCTION_DECL:
     str_decl = emit_function_decl(cursor, args)
     if str_decl:
@@ -491,14 +495,24 @@ if len(todo_macros) > 0 and not args.once:
 
     walk(macros_ast.cursor, "")
 
+last_kind = None
 for itm in output_items:
   if args.debug:
     body_escaped = itm.body.replace("\n", "\\n")
     print(f"{itm.kind}:\t\"{body_escaped}\"")
     continue
 
-  if itm.kind in ["verbose", "macro_non_primitive", "macro_empty" ]:
+  if itm.kind in ["verbose", "macro_non-primitive", "macro_empty" ]:
     if args.verbose:
       print(itm.body)
-  else:
-    print(itm.body)
+    continue
+
+  kind = itm.kind.split("_")[0]
+  # print(last_kind, kind)
+  if kind == "typedef-multi":
+    print("")
+  elif last_kind and last_kind != kind:
+    print("")
+  last_kind = kind
+
+  print(itm.body)
