@@ -277,6 +277,7 @@ from pathlib import Path
 target_header = Path(args.extras[0]).resolve()
 include_dirs = [Path(d).resolve() for d in args.include_dirs]
 user_macros = [d.split("=", 1)[0].strip() for d in args.defines]
+dict_c_identifier = {}
 def is_subpath(str_child, str_parent):
   try:
     path_child = Path(str_child).resolve()
@@ -304,15 +305,29 @@ def is_system_macro(cursor):
 
   return True
 
+def path_to_c_identifier(path, count = 2):
+  path = re.sub(r"^[\\/]+", "", path)
+  path = "_".join(Path(path).parts[(0 - count):])
+  return re.sub(r"[^a-zA-Z0-9_]", "_", path)
+
 def process_macro_definition(cursor):
+  macro_loc = None
+  loc = cursor.location
+  if loc.file:
+    c_path = path_to_c_identifier(loc.file.name)
+    print(loc.file.name, c_path)
+    macro_loc = f"{c_path}_L{loc.line}_C{loc.column}"
+    dict_c_identifier[loc.file.name] = c_path
+    dict_c_identifier[c_path] = loc.file.name
+
   macro_name = cursor.spelling
   tokens = list(cursor.get_tokens())
 
   if len(tokens) == 1:
-    return False, macro_name, None
+    return False, macro_name, None, macro_loc
 
   if len(tokens) == 2 and tokens[0].spelling == macro_name and is_oct_dec_hex(tokens[1].spelling):
-    return True, macro_name, tokens[1].spelling
+    return True, macro_name, tokens[1].spelling, macro_loc
 
   value_tokens = tokens[1:]
   if value_tokens[0].spelling == "<": # FreeType defines pathname for header location by <...>
@@ -320,7 +335,7 @@ def process_macro_definition(cursor):
   else:
     macro_value = " ".join(t.spelling for t in value_tokens)
 
-  return False, macro_name, macro_value
+  return False, macro_name, macro_value, macro_loc
 
 todo_macros = []
 
@@ -340,16 +355,14 @@ for cursor in header_ast.cursor.get_children():
     if is_system_macro(cursor):
       continue
 
-    is_primitive, macro_name, macro_value = process_macro_definition(cursor)
-    if is_primitive:
-      if macro_value:
-        str_macro_value = "".join(macro_value)
-        print(f"#define {macro_name} {str_macro_value}")
-      else:
-        print(f"#define {macro_name}")
+    is_primitive, macro_name, macro_value, macro_loc = process_macro_definition(cursor)
+    if is_primitive and macro_value:
+      print(f"#define {macro_name} {macro_value}")
     else:
-      print(f"/* {macro_name} is not primitive, enque it for genuine cpp resolver */")
-      todo_macros.append(macro_name)
+      if args.verbose:
+        print(f"/* {macro_name} is not primitive */")
+      if macro_value:
+        todo_macros.append((macro_name, macro_value, macro_loc))
 
   # elif cursor.kind == CursorKind.VAR_DECL:
   #   TODO
