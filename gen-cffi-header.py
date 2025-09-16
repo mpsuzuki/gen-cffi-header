@@ -183,8 +183,7 @@ def emit_typedef(cursor, args):
   }:
     return f"typedef {t.spelling} {typedef_name};"
 
-  if args.verbose:
-    print("/* " + str(t.kind) + " " + str(t.get_pointee().kind) + " */")
+  append_output("/* " + str(t.kind) + " " + str(t.get_pointee().kind) + " */", "verbose")
 
   # Pointer to struct
   if t.kind == TypeKind.POINTER:
@@ -234,8 +233,7 @@ def emit_struct_union_enum_decl(cursor, args, anon_union_counter = 0):
     return None
 
   if has_typedef_sibling(cursor):
-    if args.verbose:
-      print(f"/* has sibling, do not emit now */")
+    append_output(f"/* has sibling, do not emit now */", "verbose")
   elif cursor.kind == CursorKind.STRUCT_DECL:
     fields = get_fields_from_struct_or_union(cursor, indent = "  ")
     body = "\n".join(fields)
@@ -323,6 +321,13 @@ class EasyDict:
   def __setattr__(self, k, v):
     self.__dict__[k] = v
 
+output_items = []
+def append_output(s, k):
+  itm = EasyDict({})
+  itm.body = s
+  itm.kind = k
+  output_items.append(itm)
+
 def process_macro_definition(cursor):
   macro = EasyDict()
   macro.is_primitive = False
@@ -346,7 +351,7 @@ def process_macro_definition(cursor):
     return macro
 
   if len(tokens) == 2 and tokens[0].spelling == macro.name and is_oct_dec_hex(tokens[1].spelling):
-    macro.value = tokens[1]
+    macro.value = tokens[1].spelling
     macro.is_primitive = True
     return macro
 
@@ -358,7 +363,7 @@ def process_macro_definition(cursor):
 
   return macro
 
-todo_macros = []
+todo_macros = dict({})
 
 index = Index.create()
 header_ast = index.parse(args.extras[0], args = [
@@ -369,8 +374,7 @@ header_ast = index.parse(args.extras[0], args = [
 
 
 for cursor in header_ast.cursor.get_children():
-  if args.verbose:
-    print("\n/* " + str(cursor.spelling) + " " + str(cursor.kind) + " */")
+  append_output("\n/* " + str(cursor.spelling) + " " + str(cursor.kind) + " */", "verbose")
 
   if cursor.kind == CursorKind.MACRO_DEFINITION:
     if is_system_macro(cursor):
@@ -378,12 +382,14 @@ for cursor in header_ast.cursor.get_children():
 
     m = process_macro_definition(cursor)
     if m.is_primitive and m.value:
-      print(f"#define {m.name} {m.value}")
+      append_output(f"#define {m.name} {m.value}", "macro_defined")
     else:
-      if args.verbose:
-        print(f"/* {m.name} is not primitive */")
       if m.value:
-        todo_macros.append(m)
+        append_output(f"/* {m.name} is not primitive */", "macro_non_primitive")
+        todo_macros[m.name] = output_items[-1]
+        todo_macros[m.name].macro = m
+      else:
+        append_output(f"/* {m.name} is empty */", "macro_empty")
 
   # elif cursor.kind == CursorKind.VAR_DECL:
   #   TODO
@@ -391,20 +397,19 @@ for cursor in header_ast.cursor.get_children():
   elif cursor.kind == CursorKind.TYPEDEF_DECL:
     typedef = emit_typedef(cursor, args)
     if typedef:
-      print(typedef)
+      append_output(typedef, "typedef")
   elif cursor.kind in { CursorKind.STRUCT_DECL, CursorKind.UNION_DECL, CursorKind.ENUM_DECL }:
     if not cursor.is_definition():
-      if args.verbose:
-        print(f"/* {cursor.spelling} is not a definition */")
+      append_output(f"/* {cursor.spelling} is not a definition */", "verbose")
       continue
 
     str_decl = emit_struct_union_enum_decl(cursor, args)
     if str_decl:
-      print("\n" + str_decl + "\n")
+      append_output("\n" + str_decl + "\n", "struct_union_enum")
   elif cursor.kind == CursorKind.FUNCTION_DECL:
     str_decl = emit_function_decl(cursor, args)
     if str_decl:
-      print(str_decl)
+      append_output(str_decl, "function")
 
 pat_tmpfiles = os.path.join(os.getcwd(), "macro_eval_*")
 for fp_tmp in glob.glob(pat_tmpfiles):
@@ -414,40 +419,55 @@ for fp_tmp in glob.glob(pat_tmpfiles):
   except Exception as e:
     print(f"Failed to delete {fp_tmp}: {e}", file = sys.stderr)
 
-if len(todo_macros) == 0:
-  exit(0)
-
 def walk(cursor, indent):
   for c in cursor.get_children():
     if c.kind == CursorKind.ENUM_CONSTANT_DECL and c.enum_value:
+      macro_name = re.sub(r"^__", "", c.spelling)
       if c.enum_value < 0x10:
-        print(f"{indent}#define {c.spelling}\t{c.enum_value}")
+        macro_define = f"{indent}#define {macro_name}\t{c.enum_value}"
       elif c.enum_value < 0x100:
-        print(f"{indent}#define {c.spelling}\t0x{c.enum_value:02X}")
+        macro_define = f"{indent}#define {macro_name}\t0x{c.enum_value:02X}"
       elif c.enum_value < 0x10000:
-        print(f"{indent}#define {c.spelling}\t0x{c.enum_value:04X}")
+        macro_define = f"{indent}#define {macro_name}\t0x{c.enum_value:04X}"
       elif c.enum_value <= 0xFFFFFFFF:
-        print(f"{indent}#define {c.spelling}\t0x{c.enum_value:08X}")
+        macro_define = f"{indent}#define {macro_name}\t0x{c.enum_value:08X}"
       else:
-        print(f"{indent}#define {c.spelling}\t0x{c.enum_value:X}")
+        macro_define = f"{indent}#define {macro_name}\t0x{c.enum_value:X}"
+
+#      if macro_name in todo_macros:
+#        todo_macros[macro_name].body = macro_define
+#        todo_macros[macro_name].kind = "macro_defined"
+
     walk(c, indent + "  ")
 
-import tempfile
-with tempfile.NamedTemporaryFile( mode = "w+",
-                                  suffix = ".h",
-                                  dir = os.getcwd(),
-                                  prefix = "macro_eval_",
-                                  delete = False # not(args.save_temps)
-                                ) as fh_tmp:
-  print(fh_tmp.name)
-  print(f"#include \"{target_header}\"", file = fh_tmp)
-  for m in todo_macros:
-    print(f"enum __anon_{m.name}_{m.location_cstr} {{__{m.name} = {m.value}}};", file = fh_tmp)
+if len(todo_macros) > 0:
+  #for macro_name, itm in todo_macros.items():
+  #  print(f"/* {macro_name}, {itm.body}, {itm.kind} */")
+  import tempfile
+  with tempfile.NamedTemporaryFile( mode = "w+",
+                                    suffix = ".h",
+                                    dir = os.getcwd(),
+                                    prefix = "macro_eval_",
+                                    delete = False # not(args.save_temps)
+                                  ) as fh_tmp:
+    print(fh_tmp.name)
+    print(f"#include \"{target_header}\"", file = fh_tmp)
+    for macro_name, itm in todo_macros.items():
+      m = itm.macro
+      print(f"enum __anon_{m.name}_{m.location_cstr} {{__{m.name} = {m.value}}};",
+            file = fh_tmp)
 
-  macros_ast = index.parse(fh_tmp.name, args = [
-    ("-D" + macro) for macro in args.defines
-  ] + ["-I ."] + [
-    ("-I" + dir) for dir in args.include_dirs
-  ], options = TranslationUnit.PARSE_DETAILED_PROCESSING_RECORD)
+    macros_ast = index.parse(fh_tmp.name, args = [
+      ("-D" + macro) for macro in args.defines
+    ] + ["-I ."] + [
+      ("-I" + dir) for dir in args.include_dirs
+    ], options = TranslationUnit.PARSE_DETAILED_PROCESSING_RECORD)
 
-  walk(macros_ast.cursor, "")
+    walk(macros_ast.cursor, "")
+
+for itm in output_items:
+  if itm.kind == "verbose":
+    if args.verbose:
+      print(itm.body)
+  else:
+    print(itm.body)
