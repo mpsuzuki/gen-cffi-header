@@ -80,6 +80,13 @@ def has_typedef_sibling(cursor):
         return True
   return False
 
+def print_location(cursor, indent = ""):
+  if cursor.location and cursor.location.file:
+    fp = get_relative_path_from_include_dirs(cursor.location.file.name)
+    print(f"{indent}/* LOC {fp}:{cursor.location.line} */")
+  elif cursor.location:
+    print(f"{indent}/* LOC <None>:{cursor.location.line} */")
+
 def has_valid_spelling(cursor):
   return (len(cursor.spelling.split()) == 1)
 
@@ -389,7 +396,8 @@ header_ast = index.parse(args.extras[0], args = [
 
 
 for cursor in header_ast.cursor.get_children():
-  append_output("/* " + str(cursor.spelling) + " " + str(cursor.kind) + " */", "verbose")
+  if args.debug:
+    print_location(cursor)
 
   if cursor.kind == CursorKind.MACRO_DEFINITION:
     if is_system_macro(cursor):
