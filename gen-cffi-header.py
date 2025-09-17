@@ -378,7 +378,9 @@ def process_macro_definition(cursor):
     return macro
 
   value_tokens = tokens[1:]
-  if value_tokens[0].spelling == "<": # FreeType defines pathname for header location by <...>
+
+  # FreeType defines pathname for header location by <...>
+  if value_tokens[0].spelling == "<":
     macro.value = "".join(t.spelling for t in value_tokens)
   else:
     macro.value = " ".join(t.spelling for t in value_tokens)
