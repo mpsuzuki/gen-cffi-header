@@ -317,11 +317,6 @@ def is_system_macro(cursor):
 
   return True
 
-def path_to_c_identifier(path, count = 2):
-  path = re.sub(r"^[\\/]+", "", path)
-  path = "_".join(Path(path).parts[(0 - count):])
-  return re.sub(r"[^a-zA-Z0-9_]", "_", path)
-
 def get_relative_path_from_include_dirs(fp):
   _fp = str(Path(fp).resolve())
   for d in include_dirs:
@@ -329,6 +324,17 @@ def get_relative_path_from_include_dirs(fp):
     if _fp.startswith(_d):
       return _fp.removeprefix(_d)[1:]
   return fp
+
+def is_neighboring_location(loc1, loc2, threshold = 2):
+  if loc1 is None or loc2 is None:
+    return False
+
+  if loc1.path != loc2.path:
+    return False
+  if abs(loc2.line - loc1.line) > threshold:
+    return False
+
+  return True
 
 class AttrDict:
   def __init__(self, d = None):
@@ -347,25 +353,45 @@ class AttrDict:
     return self._data.keys()
 
 output_items = []
-def append_output(s, k):
-  itm = AttrDict({})
+def path_to_c_identifier(path, count = 2):
+  path = re.sub(r"^[\\/]+", "", path)
+  path = "_".join(Path(path).parts[(0 - count):])
+  return re.sub(r"[^a-zA-Z0-9_]", "_", path)
+
+def get_attrdict_from_location(location):
+  if location is not None:
+    if location.file and location.file.name:
+      r = AttrDict({
+        "path": '"' + get_relative_path_from_include_dirs(location.file.name) + '"',
+        "line": location.line,
+        "column": location.column
+      })
+    else:
+      r = AttrDict({
+        "path": "<None>",
+        "line": location.line,
+        "column": location.column
+      })
+  else:
+    r = Attr({
+        "path": "<None>", "line": 0, "column": 0
+      })
+  r.str = f"{r.path}:{r.line}"
+  r.cid = path_to_c_identifier(r.path) + f"_line{r.line}"
+  return r
+
+def append_output(s, k, location = None):
+  itm = AttrDict()
   itm.body = s
   itm.kind = k
+  if location:
+    itm.location = get_attrdict_from_location(cursor.location)
   output_items.append(itm)
 
 def process_macro_definition(cursor):
   macro = AttrDict()
   macro.is_primitive = False
-
-  loc = cursor.location
-  if loc.file:
-    c_path = path_to_c_identifier(loc.file.name)
-    macro.location = AttrDict({
-      "path": '"' + get_relative_path_from_include_dirs(loc.file.name) + '"',
-      "line": loc.line,
-      "column": loc.column
-    })
-    macro.location_cstr = f"{c_path}_L{loc.line}_C{loc.column}"
+  macro.location = get_attrdict_from_location(cursor.location)
 
   macro.name = cursor.spelling
   tokens = list(cursor.get_tokens())
@@ -517,10 +543,16 @@ if len(todo_macros) > 0 and not args.once:
     walk(macros_ast.cursor, "")
 
 prev_kind = None
+prev_loc = None
 for itm in output_items:
   if args.debug:
     body_escaped = itm.body.replace("\n", "\\n")
-    print(f"{itm.kind}:\t\"{body_escaped}\"")
+    if itm.macro:
+      loc = itm.macro.location
+      print(list(loc.keys()))
+      print(f"{itm.kind}@{loc.path}:{loc.line}\t\"{body_escaped}\"")
+    else:
+      print(f"{itm.kind}\t\"{body_escaped}\"")
     continue
 
   if itm.kind in ["verbose", "macro_non-primitive", "macro_empty" ]:
@@ -529,11 +561,26 @@ for itm in output_items:
     continue
 
   kind = itm.kind.split("_")[0]
-  # print(prev_kind, kind)
+
+  loc = None
+  if itm.location:
+    loc = itm.location
+  elif itm.macro and itm.macro.location:
+    loc = itm.macro.location
+
+  str_body = itm.body
+
   if kind == "typedef-multi":
     print("")
   elif prev_kind and prev_kind != kind:
     print("")
-  prev_kind = kind
+  elif not kind.startswith("macro"):
+    pass
+  elif is_neighboring_location(prev_loc, loc) and not args.verbose:
+    str_body = "\n".join(filter(lambda x: "#define" in x, itm.body.split("\n")))
+  else:
+    print("")
 
-  print(itm.body)
+  print(str_body)
+  prev_kind = kind
+  prev_loc = loc
