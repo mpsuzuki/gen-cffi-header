@@ -11,6 +11,8 @@ regex_numeric = re.compile(
   re.VERBOSE
 )
 
+regex_cpp_define = re.compile(r"^\s*#\s*define\s+[0-9A-Za-z_]+\s+")
+
 def is_oct_dec_hex(s):
   return bool(regex_numeric.match(s.strip()))
 
@@ -23,6 +25,8 @@ parser.add_argument("-I", dest = "include_dirs",
 parser.add_argument("-D", dest = "defines",
                     action = "append", type = str, default = [],
                     help = "Preprocessor defines")
+parser.add_argument("--no-enum", dest = "cpp2enum", action = "store_false",
+                    help = "Do not convert C preprocessor constants to enum constants")
 parser.add_argument("--once", action = "store_true",
                     help = "Do not scan 2nd pass (twice by default)")
 parser.add_argument("--save-temps", action = "store_true",
@@ -578,9 +582,23 @@ for itm in output_items:
     pass
   elif is_neighboring_location(prev_loc, loc) and not args.verbose:
     str_body = "\n".join(filter(lambda x: "#define" in x, itm.body.split("\n")))
-  else:
+  elif prev_loc is not None:
     print("")
 
-  print(str_body)
+  for _line in str_body.split("\n"):
+    if not args.cpp2enum:
+      print(_line)
+      continue
+
+    if regex_cpp_define.match(_line) is None:
+      print(_line)
+      continue
+
+    _k_v = re.sub(r"^\s*#\s*define\s+", "", _line)
+    tokens = re.split(r"\s+", _k_v, 1)
+    _k = tokens[0]
+    _v = tokens[1]
+    print(f"enum {{{_k} = {_v}}};")
+
   prev_kind = kind
   prev_loc = loc
