@@ -194,7 +194,8 @@ def emit_typedef(cursor, args):
   }:
     return f"typedef {t.spelling} {typedef_name};"
 
-  append_output("/* " + str(t.kind) + " " + str(t.get_pointee().kind) + " */", "verbose")
+  append_output("/* " + str(t.kind) + " " + str(t.get_pointee().kind) + " */",
+                "verbose", cursor.location)
 
   # Pointer to struct
   if t.kind == TypeKind.POINTER:
@@ -244,7 +245,7 @@ def emit_struct_union_enum_decl(cursor, args, anon_union_counter = 0):
     return None
 
   if has_typedef_sibling(cursor):
-    append_output(f"/* has sibling, do not emit now */", "verbose")
+    append_output(f"/* has sibling, do not emit now */", "verbose", cursor.location)
   elif cursor.kind == CursorKind.STRUCT_DECL:
     fields = get_fields_from_struct_or_union(cursor, indent = "  ")
     body = "\n".join(fields)
@@ -400,6 +401,8 @@ header_ast = index.parse(args.extras[0], args = [
 for cursor in header_ast.cursor.get_children():
   if args.debug:
     print_location(cursor)
+  append_output("/* " + str(cursor.spelling) + " " + str(cursor.kind) + " */",
+                "verbose", cursor.location)
 
   if cursor.kind == CursorKind.MACRO_DEFINITION:
     if is_system_macro(cursor):
@@ -408,17 +411,17 @@ for cursor in header_ast.cursor.get_children():
     m = process_macro_definition(cursor)
     if m.is_primitive and m.value:
       macro_defines = [
-        f"/* {m.location.path}:{m.location.line} */",
+        f"/* {m.location.str} */",
         f"#define {m.name} {m.value}"
       ]
-      append_output("\n".join(macro_defines), "macro_defined")
+      append_output("\n".join(macro_defines), "macro_defined", cursor.location)
     else:
       if m.value:
-        append_output(f"/* {m.name} is not primitive */", "macro_non-primitive")
+        append_output(f"/* {m.name} is not primitive */", "macro_non-primitive", cursor.location)
         todo_macros[m.name] = output_items[-1]
         todo_macros[m.name].macro = m
       else:
-        append_output(f"/* {m.name} is empty */", "macro_empty")
+        append_output(f"/* {m.name} is empty */", "macro_empty", cursor.location)
 
   # elif cursor.kind == CursorKind.VAR_DECL:
   #   TODO
@@ -428,21 +431,24 @@ for cursor in header_ast.cursor.get_children():
     if str_typedef is None:
       continue
     elif str_typedef.count("\n") > 0:
-      append_output(str_typedef, "typedef-multi")
+      append_output(str_typedef, "typedef-multi", cursor.location)
     else:
-      append_output(str_typedef, "typedef")
-  elif cursor.kind in { CursorKind.STRUCT_DECL, CursorKind.UNION_DECL, CursorKind.ENUM_DECL }:
+      append_output(str_typedef, "typedef", cursor.location)
+  elif cursor.kind in { CursorKind.STRUCT_DECL,
+                        CursorKind.UNION_DECL,
+                        CursorKind.ENUM_DECL }:
     if not cursor.is_definition():
-      append_output(f"/* {cursor.spelling} is not a definition */", "verbose")
+      append_output(f"/* {cursor.spelling} is not a definition */",
+                    "verbose", cursor.location)
       continue
 
     str_decl = emit_struct_union_enum_decl(cursor, args)
     if str_decl:
-      append_output(str_decl, kind_decl_map.get(cursor.kind, "unknown"))
+      append_output(str_decl, kind_decl_map.get(cursor.kind, "unknown"), cursor.location)
   elif cursor.kind == CursorKind.FUNCTION_DECL:
     str_decl = emit_function_decl(cursor, args)
     if str_decl:
-      append_output(str_decl, "function")
+      append_output(str_decl, "function", cursor.location)
 
 pat_tmpfiles = os.path.join(os.getcwd(), "macro_eval_*")
 for fp_tmp in glob.glob(pat_tmpfiles):
@@ -499,7 +505,7 @@ if len(todo_macros) > 0 and not args.once:
     print(f"#include \"{target_header}\"", file = fh_tmp)
     for macro_name, itm in todo_macros.items():
       m = itm.macro
-      print(f"enum __anon_{m.name}_{m.location_cstr} {{__{m.name} = {m.value}}};",
+      print(f"enum __anon_{m.name}_{m.location.cid} {{__{m.name} = {m.value}}};",
             file = fh_tmp)
 
     macros_ast = index.parse(fh_tmp.name, args = [
