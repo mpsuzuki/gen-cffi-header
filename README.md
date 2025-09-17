@@ -18,7 +18,7 @@ A named structure/union/enum should be defined, then refer it in typedef.
 
 ## How to use
 
-'''
+```
 ./gen-cffi-header.py `pkg-config --cflags freetype2` test-variable.h > test-variable.py.h
 ./load-cffi-cdef.py test-variable.py.h
-'''
+```
