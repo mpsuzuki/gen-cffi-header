@@ -146,9 +146,11 @@ def get_relative_path_from_include_dirs(fp):
 
   if cursor.location and cursor.location.file:
     fp = '"' + get_relative_path_from_include_dirs(cursor.location.file.name) + '"'
-    print(f"{indent}/* file:{fp} line:{cursor.location.line} kind:{str_kind} */")
+    if args.debug:
+      print(f"{indent}/* file:{fp} line:{cursor.location.line} kind:{str_kind} */")
   elif cursor.location:
-    print(f"{indent}/* file:<None> line:{cursor.location.line} kind:{str_kind} */")
+    if args.debug:
+      print(f"{indent}/* file:<None> line:{cursor.location.line} kind:{str_kind} */")
 
 def has_single_token_spelling(cursor):
   return (len(cursor.spelling.split()) == 1)
@@ -169,10 +171,11 @@ def walk(cursor, indent):
 
     # str_info = "\t".join([str_loc, cursor.get_usr(), str_kind, cursor.spelling])
     str_info = "\t".join([str_loc, str_kind, cursor.spelling])
-    print(f"{indent}{str_info}")
+    if args.debug:
+      print(f"{indent}{str_info}")
 
     itm = AttrDict()
-    itm.location_str = str_info
+    itm.location_str = str_loc
     itm.cursor = cursor
 
     if cursor.kind in producer_kinds:
@@ -180,7 +183,8 @@ def walk(cursor, indent):
         itm.users = set({})
         words_produced[cursor.spelling] = itm
       else:
-        print(f"{indent}# this declaration has no name, do not collect")
+        if args.debug:
+          print(f"{indent}# this declaration has no name, do not collect")
     elif cursor.kind in consumer_kinds and cursor.referenced:
       ref_spell = cursor.referenced.spelling
       if ref_spell in words_consumed:
@@ -206,20 +210,38 @@ if args.debug:
   set_words_consumed = set(words_consumed.keys())
   print(set_words_consumed - set_words_produced)
 
+cursorModifier = dict({})
 for spelling, itm in words_produced.items():
-  print(f"spelling={spelling}, {len(itm.users)} users")
+  if args.debug:
+    print(f"spelling={spelling}, {len(itm.users)} users")
   # if spelling not in words_consumed:
   #   continue
 
-  if args.debug:
-    spelling_modified = modify_word(spelling)
-    if spelling_modified != spelling:
+  spelling_modified = modify_word(spelling)
+  if spelling_modified != spelling:
+    if args.debug:
       print(f"At {itm.location_str}: {spelling} -> {spelling_modified}")
+    cursorModifier[itm.cursor] = AttrDict({
+      "location_str": itm.location_str,
+      "spelling_old": spelling,
+      "spelling": spelling_modified
+    })
 
-      for itm_user in itm.users:
-        spelling_user_modified = get_modified_spelling_at_cursor(itm_user.cursor, spelling)
+    for itm_user in itm.users:
+      spelling_user_modified = get_modified_spelling_at_cursor(itm_user.cursor, spelling)
+      if args.debug:
         print(f"At {itm_user.location_str}: "
               f"{itm_user.cursor.spelling} -> "
               f"{spelling_user_modified}"
         )
+      cursorModifier[itm_user.cursor] = AttrDict({
+        "location_str": itm_user.location_str,
+        "spelling_old": itm_user.cursor.spelling,
+        "spelling": spelling_user_modified
+      })
+
+    if args.debug:
       print("")
+
+for cursor, itm in cursorModifier.items():
+  print(f"{itm.location_str} {itm.spelling_old} -> {itm.spelling}")
