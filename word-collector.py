@@ -70,13 +70,26 @@ if args.word_modification in {"MINIMUM", "HYBRID"}:
   import keyword
   if args.modify_words_in is None:
     args.modify_words_in = set([])
-  args.modify_words_in.update(keywords.kwlist)
+  args.modify_words_in.update(keyword.kwlist)
 
 def modify_word(word_original):
   if args.word_modification == "NONE":
     return word_original
   elif args.word_modification == "ALWAYS" or word_original in args.modify_words_in:
     return args.modifier_prefix + word_original + args.modifier_suffix
+  else:
+    return word_original
+
+def get_modified_spelling_at_cursor(cursor, word_to_modify):
+  # print(f"\tget_modified_spelling_at_cursor({cursor.spelling}, {word_to_modify})")
+  outs = []
+  for token in cursor.translation_unit.get_tokens(extent = cursor.extent):
+    if token.spelling == word_to_modify:
+      outs.append(modify_word(token.spelling))
+      # print(f"\t\t\t{token.spelling} -> {outs[-1]}")
+    else:
+      outs.append(token.spelling)
+  return " ".join(outs)
 
 user_macros = [d.split("=", 1)[0].strip() for d in args.defines]
 
@@ -137,9 +150,11 @@ def get_relative_path_from_include_dirs(fp):
   elif cursor.location:
     print(f"{indent}/* file:<None> line:{cursor.location.line} kind:{str_kind} */")
 
+def has_single_token_spelling(cursor):
+  return (len(cursor.spelling.split()) == 1)
+
 words_produced = dict()
 words_consumed = dict()
-words_referenced = dict()
 def walk(cursor, indent):
   if not is_system_macro(cursor):
     if cursor.location:
@@ -156,20 +171,24 @@ def walk(cursor, indent):
     str_info = "\t".join([str_loc, str_kind, cursor.spelling])
     print(f"{indent}{str_info}")
 
-    if cursor.kind in producer_kinds:
-      words_produced[cursor.spelling] = str_loc
-    elif cursor.kind in consumer_kinds:
-      if cursor.spelling in words_consumed:
-        words_consumed[cursor.spelling].add(str_loc)
-      else:
-        words_consumed[cursor.spelling] = set([str_loc])
+    itm = AttrDict()
+    itm.location_str = str_info
+    itm.cursor = cursor
 
-      if cursor.referenced is None:
-        pass
-      elif cursor.referenced.spelling in words_referred:
-        words_referenced[cursor.referenced.spelling].add(str_loc)
+    if cursor.kind in producer_kinds:
+      if has_single_token_spelling(cursor):
+        itm.users = set({})
+        words_produced[cursor.spelling] = itm
       else:
-        words_referenced[cursor.referenced.spelling] = set([str_loc])
+        print(f"{indent}# this declaration has no name, do not collect")
+    elif cursor.kind in consumer_kinds and cursor.referenced:
+      ref_spell = cursor.referenced.spelling
+      if ref_spell in words_consumed:
+        words_consumed[ref_spell].add(itm)
+      else:
+        words_consumed[ref_spell] = set([itm])
+      if ref_spell in words_produced:
+        words_produced[ref_spell].users.add(itm)
 
   for c in cursor.get_children():
     walk(c, indent + "  ")
@@ -182,9 +201,25 @@ header_ast = index.parse(args.extras[0], args = [
 ], options = TranslationUnit.PARSE_DETAILED_PROCESSING_RECORD)
 walk(header_ast.cursor, "")
 
-set_words_produced = set(words_produced.keys())
-set_words_consumed = set(words_consumed.keys())
-set_words_referenced = set(words_referenced.keys())
+if args.debug:
+  set_words_produced = set(words_produced.keys())
+  set_words_consumed = set(words_consumed.keys())
+  print(set_words_consumed - set_words_produced)
 
-print(list(set_words_produced - set_words_consumed - set_words_referenced))
-print(list(set_words_referenced - set_words_produced))
+for spelling, itm in words_produced.items():
+  print(f"spelling={spelling}, {len(itm.users)} users")
+  # if spelling not in words_consumed:
+  #   continue
+
+  if args.debug:
+    spelling_modified = modify_word(spelling)
+    if spelling_modified != spelling:
+      print(f"At {itm.location_str}: {spelling} -> {spelling_modified}")
+
+      for itm_user in itm.users:
+        spelling_user_modified = get_modified_spelling_at_cursor(itm_user.cursor, spelling)
+        print(f"At {itm_user.location_str}: "
+              f"{itm_user.cursor.spelling} -> "
+              f"{spelling_user_modified}"
+        )
+      print("")
