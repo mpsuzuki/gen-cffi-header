@@ -33,9 +33,38 @@ parser.add_argument("--save-temps", action = "store_true",
                     help = "Keep temporary files (remove by default)")
 parser.add_argument("--debug", action = "store_true",
                     help = "Debug")
+parser.add_argument("--word-modification", type = str, default = "NONE",
+                    help = "Mode of field/type modification: {ALWAYS|MINIMUM|LIST|HYBRID}")
+parser.add_argument("--modify-words-in", type = str, default = None,
+                    help = "Pathname of the list of the words to be modified")
+parser.add_argument("--modifier-prefix", type = str, default = "",
+                    help = "String to insert before the words to be modified")
+parser.add_argument("--modifier-suffix", type = str, default = "_",
+                    help = "String to append after the words to be modified")
 parser.add_argument("extras", nargs = 1,
                     help = "Path to the header file")
 args = parser.parse_args()
+args.word_modification = args.word_modification.upper()
+
+if args.modify_words_in is not None and args.word_modification == "LIST":
+  with open(args.modify_words_in, "r") as fh:
+    args.modify_words_in = set([])
+    for _line in fh.read().split("\n"):
+      _toks = re.split(r"[^0-9A-Za-z_]", _line)
+      if len(_toks) > 0:
+        args.modify_words_in.add(_toks[0])
+
+if args.word_modification in {"MINIMUM", "HYBRID"}:
+  import keyword
+  if args.modify_words_in is None:
+    args.modify_words_in = set([])
+  args.modify_words_in.update(keywords.kwlist)
+
+def modify_word(word_original):
+  if args.word_modification == "NONE":
+    return word_original
+  elif args.word_modification == "ALWAYS" or word_original in args.modify_words_in:
+    return args.modifier_prefix + word_original + args.modifier_suffix
 
 from clang.cindex import Index, CursorKind, TypeKind, TranslationUnit
 
@@ -104,17 +133,19 @@ def get_fields_from_struct_or_union(decl, indent = "  ", anon_counter = [1]):
       loc_info = ""
 
     if child.kind == CursorKind.FIELD_DECL:
-      field_type = child.type
-      field_name = child.spelling
+      field_type = modify_word(child.type)
+      field_name = modify_word(child.spelling)
 
       if field_type.kind == TypeKind.CONSTANTARRAY:
-        elem_type  = field_type.element_type.spelling
+        elem_type  = modify_word(field_type.element_type.spelling)
         array_size = field_type.element_count
         fields.append(f"{indent}{elem_type} {field_name}[{array_size}];")
       else:
         fields.append(f"{indent}{field_type.spelling} {field_name};")
     elif child.kind in {CursorKind.STRUCT_DECL, CursorKind.UNION_DECL}:
       if has_valid_spelling(child.type) and has_valid_spelling(child):
+        field_type = modify_word(child.type)
+        field_name = modify_word(child.spelling)
         fields.append(f"{indent}{child.type.spelling} {child.spelling};")
       else:
         kind_str   = kind_decl_map.get(child.kind, "unknown")
@@ -131,7 +162,7 @@ def get_constants_from_enum(decl):
   constants = []
   for child in decl.get_children():
     if child.kind == CursorKind.ENUM_CONSTANT_DECL:
-      name = child.spelling
+      name = modify_word(child.spelling)
       val  = child.enum_value
       if val < 0x10:
         constants.append(f"  {name} = {val},")
@@ -157,7 +188,7 @@ def emit_inline_typedef_with_body(cursor, args):
     t = t.get_named_type()
 
   decl = t.get_declaration()
-  tag_name = decl.spelling
+  tag_name = word_modify(decl.spelling)
 
   #if t.kind not in {TypeKind.UNION, TypeKind.RECORD}:
   #  return None
