@@ -120,7 +120,7 @@ def print_location(cursor, indent = ""):
   elif cursor.location:
     print(f"{indent}/* LOC <None>:{cursor.location.line} */")
 
-def has_valid_spelling(cursor):
+def has_single_token_spelling(cursor):
   return (len(cursor.spelling.split()) == 1)
 
 def get_fields_from_struct_or_union(decl, indent = "  ", anon_counter = [1]):
@@ -143,7 +143,7 @@ def get_fields_from_struct_or_union(decl, indent = "  ", anon_counter = [1]):
       else:
         fields.append(f"{indent}{field_type.spelling} {field_name};")
     elif child.kind in {CursorKind.STRUCT_DECL, CursorKind.UNION_DECL}:
-      if has_valid_spelling(child.type) and has_valid_spelling(child):
+      if has_single_token_spelling(child.type) and has_single_token_spelling(child):
         field_type = modify_word(child.type)
         field_name = modify_word(child.spelling)
         fields.append(f"{indent}{child.type.spelling} {child.spelling};")
@@ -284,21 +284,21 @@ def emit_struct_union_enum_decl(cursor, args, anon_union_counter = 0):
   elif cursor.kind == CursorKind.STRUCT_DECL:
     fields = get_fields_from_struct_or_union(cursor, indent = "  ")
     body = "\n".join(fields)
-    if has_valid_spelling(cursor):
+    if has_single_token_spelling(cursor):
       return f"struct {cursor.spelling} {{\n{body}\n}};"
     else:
       return None
   elif cursor.kind == CursorKind.UNION_DECL:
     fields = get_fields_from_struct_or_union(cursor, indent = "  ")
     body = "\n".join(fields)
-    if has_valid_spelling(cursor):
+    if has_single_token_spelling(cursor):
       return f"union {cursor.spelling} {{\n{body}\n}};"
     else:
       return None
   elif cursor.kind == CursorKind.ENUM_DECL:
     constants = get_constants_from_enum(cursor)
     body = "\n".join(constants)
-    if has_valid_spelling(cursor):
+    if has_single_token_spelling(cursor):
       return f"enum {cursor.spelling} {{\n{body}\n}};"
     else:
       return f"enum {{\n{body}\n}};"
