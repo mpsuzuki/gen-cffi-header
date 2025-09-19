@@ -42,14 +42,14 @@ parser.add_argument("-D", dest = "defines",
                     help = "Preprocessor defines")
 parser.add_argument("--debug", action = "store_true",
                     help = "Debug")
-#parser.add_argument("--word-modification", type = str, default = "NONE",
-#                    help = "Mode of field/type modification: {ALWAYS|MINIMUM|LIST|HYBRID}")
-#parser.add_argument("--modify-words-in", type = str, default = None,
-#                    help = "Pathname of the list of the words to be modified")
-#parser.add_argument("--modifier-prefix", type = str, default = "",
-#                    help = "String to insert before the words to be modified")
-#parser.add_argument("--modifier-suffix", type = str, default = "_",
-#                    help = "String to append after the words to be modified")
+parser.add_argument("--word-modification", type = str, default = "NONE",
+                    help = "Mode of field/type modification: {ALWAYS|MINIMUM|LIST|HYBRID}")
+parser.add_argument("--modify-words-in", type = str, default = None,
+                    help = "Pathname of the list of the words to be modified")
+parser.add_argument("--modifier-prefix", type = str, default = "",
+                    help = "String to insert before the words to be modified")
+parser.add_argument("--modifier-suffix", type = str, default = "_",
+                    help = "String to append after the words to be modified")
 parser.add_argument("extras", nargs = 1,
                     help = "Path to the header file")
 args = parser.parse_args()
@@ -57,26 +57,26 @@ args = parser.parse_args()
 target_header = Path(args.extras[0]).resolve()
 include_dirs = [Path(d).resolve() for d in args.include_dirs]
 
-#args.word_modification = args.word_modification.upper()
-#if args.modify_words_in is not None and args.word_modification == "LIST":
-#  with open(args.modify_words_in, "r") as fh:
-#    args.modify_words_in = set([])
-#    for _line in fh.read().split("\n"):
-#      _toks = re.split(r"[^0-9A-Za-z_]", _line)
-#      if len(_toks) > 0:
-#        args.modify_words_in.add(_toks[0])
-#
-#if args.word_modification in {"MINIMUM", "HYBRID"}:
-#  import keyword
-#  if args.modify_words_in is None:
-#    args.modify_words_in = set([])
-#  args.modify_words_in.update(keywords.kwlist)
-#
-#def modify_word(word_original):
-#  if args.word_modification == "NONE":
-#    return word_original
-#  elif args.word_modification == "ALWAYS" or word_original in args.modify_words_in:
-#    return args.modifier_prefix + word_original + args.modifier_suffix
+args.word_modification = args.word_modification.upper()
+if args.modify_words_in is not None and args.word_modification == "LIST":
+  with open(args.modify_words_in, "r") as fh:
+    args.modify_words_in = set([])
+    for _line in fh.read().split("\n"):
+      _toks = re.split(r"[^0-9A-Za-z_]", _line)
+      if len(_toks) > 0:
+        args.modify_words_in.add(_toks[0])
+
+if args.word_modification in {"MINIMUM", "HYBRID"}:
+  import keyword
+  if args.modify_words_in is None:
+    args.modify_words_in = set([])
+  args.modify_words_in.update(keywords.kwlist)
+
+def modify_word(word_original):
+  if args.word_modification == "NONE":
+    return word_original
+  elif args.word_modification == "ALWAYS" or word_original in args.modify_words_in:
+    return args.modifier_prefix + word_original + args.modifier_suffix
 
 user_macros = [d.split("=", 1)[0].strip() for d in args.defines]
 
