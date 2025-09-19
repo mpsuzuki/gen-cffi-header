@@ -57,9 +57,6 @@ args = parser.parse_args()
 target_header = Path(args.extras[0]).resolve()
 include_dirs = [Path(d).resolve() for d in args.include_dirs]
 
-words_provided = set([])
-words_referred = set([])
-
 #args.word_modification = args.word_modification.upper()
 #if args.modify_words_in is not None and args.word_modification == "LIST":
 #  with open(args.modify_words_in, "r") as fh:
