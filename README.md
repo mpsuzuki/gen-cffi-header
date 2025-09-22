@@ -16,6 +16,25 @@ A string, a function or an empty (define or not-defined) value is unacceptable.
 * Inline structure/union/enum declaration in typedef is not supported.
 A named structure/union/enum should be defined, then refer it in typedef.
 
+## Dependencies
+
+Author used following packages.
+
+```
+cffi==2.0.0
+libclang==18.1.1
+pkgconfig==1.5.5
+pycparser==2.23
+```
+
+To use gen-cffi-header.py and load-cffi-cdef.py,
+
+```
+pip install cffi libclang
+```
+
+would be enough.
+
 ## How to use
 
 ```
