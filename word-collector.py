@@ -50,12 +50,31 @@ parser.add_argument("--modifier-prefix", type = str, default = "",
                     help = "String to insert before the words to be modified")
 parser.add_argument("--modifier-suffix", type = str, default = "_",
                     help = "String to append after the words to be modified")
+parser.add_argument("--decls-modify", type = str, default = "field,enum_constant,macro_definition",
+                    help = "CSV-string to select the declarations to modify "
+                           "(default = field,enum_constant,macro_definition)")
 parser.add_argument("extras", nargs = 1,
                     help = "Path to the header file")
 args = parser.parse_args()
 
+args.decls_modify = args.decls_modify.split(",")
+
 target_header = Path(args.extras[0]).resolve()
 include_dirs = [Path(d).resolve() for d in args.include_dirs]
+
+def is_selected_kind(_k):
+  if "_".join(str(_k).split(".")[-1].split("_")[0:-1]).lower() in args.decls_modify:
+    if args.debug:
+      print(f"{_k} is selected")
+    return True
+  else:
+    if args.debug:
+      print(f"{_k} is not selected")
+    return False
+
+producer_kinds = {
+  _k for _k in producer_kinds if is_selected_kind(_k)
+}
 
 args.word_modification = args.word_modification.upper()
 if args.modify_words_in is not None and args.word_modification == "LIST":
