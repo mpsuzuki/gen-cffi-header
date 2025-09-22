@@ -155,46 +155,63 @@ def get_relative_path_from_include_dirs(fp):
 def has_single_token_spelling(cursor):
   return (len(cursor.spelling.split()) == 1)
 
+def get_location_str_from_cursor(cursor):
+  if cursor.location:
+    if cursor.location.file:
+      loc_path = get_relative_path_from_include_dirs(cursor.location.file.name)
+    else:
+      loc_path = "<None>"
+    str_loc = f"{loc_path}:{cursor.location.line}:{cursor.location.column}"
+  else:
+    str_loc = "<None>"
+  return str_loc
+
 def get_cursor_modifier(header_ast):
   words_produced = dict()
   words_consumed = dict()
 
+  def create_attrdict_by_cursor(cursor, location_str = None):
+    itm = AttrDict()
+    itm.cursor = cursor
+    if location_str:
+      itm.location_str = location_str
+    else:
+      itm.location_str = get_location_str_from_cursor(cursor)
+    return itm
+
+  def update_words_produced(cursor, location_str = None):
+    if not has_single_token_spelling(cursor):
+      if args.debug:
+        print(f"{indent}# this declaration has no name, do not collect")
+      return None
+
+    itm = create_attrdict_by_cursor(cursor, location_str = location_str)
+    itm.users = set({})
+    words_produced[cursor.spelling] = itm
+    return itm
+
+  def update_words_consumed(cursor, location_str = None):
+    itm = create_attrdict_by_cursor(cursor, location_str)
+    ref_spell = cursor.referenced.spelling
+    if ref_spell in words_consumed:
+      words_consumed[ref_spell].add(itm)
+    else:
+      words_consumed[ref_spell] = set([itm])
+
+    if ref_spell in words_produced:
+      words_produced[ref_spell].users.add(itm)
+    return itm
+
   def walk(cursor, indent):
     if not is_system_macro(cursor):
-      if cursor.location:
-        if cursor.location.file:
-          loc_path = get_relative_path_from_include_dirs(cursor.location.file.name)
-        else:
-          loc_path = "<None>"
-        str_loc = f"{loc_path}:{cursor.location.line}:{cursor.location.column}"
-      else:
-        str_loc = "<None>"
+      str_loc = get_location_str_from_cursor(cursor)
       str_kind = str(cursor.kind).split(".")[-1]
-
-      # str_info = "\t".join([str_loc, cursor.get_usr(), str_kind, cursor.spelling])
       str_info = "\t".join([str_loc, str_kind, cursor.spelling])
-      if args.debug:
-        print(f"{indent}{str_info}")
-
-      itm = AttrDict()
-      itm.location_str = str_loc
-      itm.cursor = cursor
 
       if cursor.kind in producer_kinds:
-        if has_single_token_spelling(cursor):
-          itm.users = set({})
-          words_produced[cursor.spelling] = itm
-        else:
-          if args.debug:
-            print(f"{indent}# this declaration has no name, do not collect")
+        update_words_produced(cursor, location_str = str_loc)
       elif cursor.kind in consumer_kinds and cursor.referenced:
-        ref_spell = cursor.referenced.spelling
-        if ref_spell in words_consumed:
-          words_consumed[ref_spell].add(itm)
-        else:
-          words_consumed[ref_spell] = set([itm])
-        if ref_spell in words_produced:
-          words_produced[ref_spell].users.add(itm)
+        update_words_consumed(cursor, location_str = str_loc)
 
     for c in cursor.get_children():
       walk(c, indent + "  ")
