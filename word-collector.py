@@ -19,15 +19,15 @@ parser.add_argument("-D", dest = "defines",
                     help = "Preprocessor defines")
 parser.add_argument("--debug", action = "store_true",
                     help = "Debug")
-parser.add_argument("--word-modification", type = str, default = "NONE",
+parser.add_argument("--selection", type = str, default = "MINIMUM",
                     help = "Mode of field/type modification: {ALWAYS|MINIMUM|LIST|HYBRID}")
-parser.add_argument("--modify-words-in", type = str, default = None,
-                    help = "Pathname of the list of the words to be modified")
+parser.add_argument("--modify-names-in", type = str, default = None,
+                    help = "Pathname of the list of the names to be modified")
 parser.add_argument("--modifier-prefix", type = str, default = "",
                     help = "String to insert before the words to be modified")
 parser.add_argument("--modifier-suffix", type = str, default = "_",
                     help = "String to append after the words to be modified")
-parser.add_argument("--decls-modify", type = str, default = "field,enum_constant,macro_definition",
+parser.add_argument("--kinds-modify", type = str, default = "field,enum_constant,macro_definition",
                     help = "CSV-string to select the declarations to modify "
                            "(default = field,enum_constant,macro_definition)")
 parser.add_argument("extras", nargs = 1,
@@ -348,10 +348,10 @@ class HeaderProcessor:
 
 header_processor = HeaderProcessor()
 header_processor.set_debug(args.debug)
-header_processor.set_emitter_kinds_by_csv(args.decls_modify)
+header_processor.set_emitter_kinds_by_csv(args.kinds_modify)
 header_processor.modifier.prefix = args.modifier_prefix
 header_processor.modifier.suffix = args.modifier_suffix
-header_processor.modifier.set_selection_by_str(args.word_modification, args.modify_words_in)
+header_processor.modifier.set_selection_by_str(args.selection, args.modify_names_in)
 header_processor.cpp.defines = args.defines
 header_processor.cpp.include_dirs = args.include_dirs
 index = Index.create()
