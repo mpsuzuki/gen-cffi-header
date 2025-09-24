@@ -124,8 +124,20 @@ class ASTNameCollector:
       return n
 
     def get_modified_spelling_at_cursor(self, cursor, name_to_modify, check_kind = False):
+      if self.debug:
+        print(f"{self.indent * 2}cursor: {str(cursor.kind)} {cursor.spelling}"
+              f" {cursor.location.file.name}:{cursor.location.line}"
+              f":{cursor.extent.start.column}"
+            f"..{cursor.extent.end.column}"
+        )
       modified = []
       for token in cursor.translation_unit.get_tokens(extent = cursor.extent):
+        if self.debug:
+          print(f"{self.indent * 3}token: {str(token.kind)} {token.spelling}"
+                f" {token.location.file.name}:{token.location.line}"
+                f":{token.extent.start.column}"
+                f"..{token.extent.end.column}"
+          )
         if token.spelling == name_to_modify:
           if check_kind:
             modified.append(self.modify_name(token.spelling, cursor.kind))
@@ -133,6 +145,9 @@ class ASTNameCollector:
             modified.append(self.modify_name(token.spelling))
         else:
           modified.append(token.spelling)
+      if self.debug:
+        spelling_modified = " ".join(modified)
+        print(f"{self.indent * 2}get_modified_spelling_at_cursor(): {cursor.spelling} {spelling_modified}")
       return " ".join(modified)
 
   class Cpp:
