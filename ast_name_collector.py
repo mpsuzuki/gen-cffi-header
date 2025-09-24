@@ -95,6 +95,22 @@ class ASTNameCollector:
       self.prefix = ""
       self.suffix = "_"
 
+    def dump_extent(self, obj, prefix = "", indent = ""):
+      path_file = obj.extent.start.file.name
+      if self.get_relative_path:
+        path_file = self.get_relative_path(path_file)
+      print(f"{indent}{prefix}: {str(obj.kind)} "
+            f"\'{str(obj.spelling)}\'"
+            f" @{path_file}:"
+            f"{obj.extent.start.line}:"
+            f"{obj.extent.start.column}.."
+            f"{obj.extent.end.column}"
+      )
+
+    def dump_tokens_at_cursor(self, cursor, indent = ""):
+      for token in cursor.translation_unit.get_tokens(extent = cursor.extent):
+        self.dump_extent(token, prefix = "token", indent = indent)
+
     @staticmethod
     def load_name_set_from_file(path_list):
       name_set = None
@@ -125,29 +141,20 @@ class ASTNameCollector:
 
     def get_modified_spelling_at_cursor(self, cursor, name_to_modify, check_kind = False):
       if self.debug:
-        print(f"{self.indent * 2}cursor: {str(cursor.kind)} {cursor.spelling}"
-              f" {cursor.location.file.name}:{cursor.location.line}"
-              f":{cursor.extent.start.column}"
-            f"..{cursor.extent.end.column}"
-        )
+        self.dump_extent(cursor, "cursor", self.indent * 2)
+        self.dump_tokens_at_cursor(cursor, self.indent * 3)
       modified = []
       for token in cursor.translation_unit.get_tokens(extent = cursor.extent):
-        if self.debug:
-          print(f"{self.indent * 3}token: {str(token.kind)} {token.spelling}"
-                f" {token.location.file.name}:{token.location.line}"
-                f":{token.extent.start.column}"
-                f"..{token.extent.end.column}"
-          )
-        if token.spelling == name_to_modify:
-          if check_kind:
-            modified.append(self.modify_name(token.spelling, cursor.kind))
-          else:
-            modified.append(self.modify_name(token.spelling))
-        else:
+        if token.spelling != name_to_modify or token.location != cursor.location:
           modified.append(token.spelling)
+        elif check_kind:
+          modified.append(self.modify_name(token.spelling, cursor.kind))
+        else:
+          modified.append(self.modify_name(token.spelling))
       if self.debug:
         spelling_modified = " ".join(modified)
-        print(f"{self.indent * 2}get_modified_spelling_at_cursor(): {cursor.spelling} {spelling_modified}")
+        print(f"{self.indent * 2}get_modified_spelling_at_cursor(): "
+              f"{cursor.spelling} -> {spelling_modified}")
       return " ".join(modified)
 
   class Cpp:
@@ -316,14 +323,15 @@ class ASTNameCollector:
     for e_spell, e_adic in dic_emitters.items():
       e_spell_modified = self.modifier.modify_name(e_spell, e_adic.cursor.kind)
       if e_spell_modified != e_spell:
-        if self.debug:
-          print(f"At {e_adic.location_str}: {e_spell} -> {e_spell_modified}")
         substitution_graph[e_adic.cursor] = AttrDict({
           "location_str": e_adic.location_str,
           "spelling_old": e_spell,
           "spelling": e_spell_modified
         })
-
+        if self.debug:
+          print(f"At {e_adic.location_str}: {e_spell} -> {e_spell_modified}")
+          self.modifier.dump_extent(e_adic.cursor, "cursor", self.indent)
+          self.modifier.dump_tokens_at_cursor(e_adic.cursor, self.indent * 2)
         for r_adic in e_adic.receivers:
           r_spell_modified = self.modifier.get_modified_spelling_at_cursor(r_adic.cursor, e_spell, check_kind = False)
           if self.debug:
