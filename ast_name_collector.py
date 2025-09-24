@@ -114,18 +114,23 @@ class ASTNameCollector:
       if self.selection.needs_list():
         self.name_coverage |= type(self).get_name_set_from_file(path_list)
 
-    def modify_name(self, n):
+    def modify_name(self, n, kind = None):
       if self.selection.is_none():
+        return n
+      if kind is not None and kind not in self.emitter_kinds:
         return n
       if (self.selection.is_always() or n in self.name_coverage):
         return self.prefix + n + self.suffix
       return n
 
-    def get_modified_spelling_at_cursor(self, cursor, name_to_modify):
+    def get_modified_spelling_at_cursor(self, cursor, name_to_modify, check_kind = False):
       modified = []
       for token in cursor.translation_unit.get_tokens(extent = cursor.extent):
         if token.spelling == name_to_modify:
-          modified.append(self.modify_name(token.spelling))
+          if check_kind:
+            modified.append(self.modify_name(token.spelling, cursor.kind))
+          else:
+            modified.append(self.modify_name(token.spelling))
         else:
           modified.append(token.spelling)
       return " ".join(modified)
@@ -294,7 +299,7 @@ class ASTNameCollector:
 
     substitution_graph = dict({})
     for e_spell, e_adic in dic_emitters.items():
-      e_spell_modified = self.modifier.modify_name(e_spell)
+      e_spell_modified = self.modifier.modify_name(e_spell, e_adic.cursor.kind)
       if e_spell_modified != e_spell:
         if self.debug:
           print(f"At {e_adic.location_str}: {e_spell} -> {e_spell_modified}")
@@ -305,7 +310,7 @@ class ASTNameCollector:
         })
 
         for r_adic in e_adic.receivers:
-          r_spell_modified = self.modifier.get_modified_spelling_at_cursor(r_adic.cursor, e_spell)
+          r_spell_modified = self.modifier.get_modified_spelling_at_cursor(r_adic.cursor, e_spell, check_kind = False)
           if self.debug:
             print(f"{self.indent}At {r_adic.location_str}: "
                   f"{r_adic.cursor.spelling} -> "
