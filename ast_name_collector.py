@@ -274,8 +274,8 @@ class ASTNameCollector:
     # walk() collect all candidates of emitters and receivers,
     # walk() does not care the detailed kinds and names specified
     # by the options stored in self.modifier. Distinction of the
-    # names to be modified or preserved is the role of Modifier,
-    # not the role of the HeaderProcessor.
+    # names to be modified or preserved is delayed to the generation
+    # of substitution_graph.
     def walk(cursor, indent):
       if not self.cpp.is_system_macro(cursor):
         str_loc = self.get_location_str_from_cursor(cursor)
