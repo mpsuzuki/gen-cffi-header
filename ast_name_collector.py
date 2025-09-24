@@ -96,7 +96,7 @@ class ASTNameCollector:
       self.suffix = "_"
 
     @staticmethod
-    def get_name_set_from_file(path_list):
+    def load_name_set_from_file(path_list):
       name_set = None
       with open(path_list, "r") as fh:
         name_set = set({})
@@ -112,7 +112,7 @@ class ASTNameCollector:
         self.name_coverage |= set(keyword.kwlist)
 
       if self.selection.needs_list():
-        self.name_coverage |= type(self).get_name_set_from_file(path_list)
+        self.name_coverage |= type(self).load_name_set_from_file(path_list)
 
     def modify_name(self, n, kind = None):
       if self.selection.is_none():
