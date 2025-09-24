@@ -94,6 +94,7 @@ class ASTNameCollector:
       self.name_coverage = set({})
       self.prefix = ""
       self.suffix = "_"
+      self.get_relative_path = None
 
     def dump_extent(self, obj, prefix = "", indent = ""):
       path_file = obj.extent.start.file.name
@@ -218,6 +219,7 @@ class ASTNameCollector:
     self.indent = indent
     self.modifier.indent = self.indent
     self.cpp.indent = self.indent
+    self.modifier.get_relative_path = self.cpp.get_relative_path
 
   def set_indent(indent):
     self.indent = indent
