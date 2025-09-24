@@ -89,6 +89,7 @@ class ASTNameCollector:
         ## CursorKind.ENUM_DECL,
         ## CursorKind.TYPEDEF_DECL,
       }
+      self.debug = False
       self.selection = type(self).Selection.NONE
       self.name_coverage = set({})
       self.prefix = ""
