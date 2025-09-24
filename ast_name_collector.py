@@ -181,13 +181,22 @@ class ASTNameCollector:
           return _fp.removeprefix(_d)[1:]
       return fp
 
-  def __init__(self):
+  def __init__(self, indent = "  "):
     self.debug = None
-    self.indent = "  "
     self.source = AttrDict()
     self.parsed_ast = None
     self.modifier = type(self).Modifier()
     self.cpp = type(self).Cpp()
+
+    self.indent = indent
+    self.modifier.indent = self.indent
+    self.cpp.indent = self.indent
+
+  def set_indent(indent):
+    self.indent = indent
+    self.modifier.indent = indent
+    self.cpp.indent = indent
+    return self
 
   def set_debug(self, d):
     self.debug = d
