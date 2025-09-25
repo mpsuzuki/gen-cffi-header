@@ -252,13 +252,19 @@ class ASTNameCollector:
   def has_single_token_spelling(cursor):
     return (len(cursor.spelling.split()) == 1)
 
-  def get_location_str_from_cursor(self, cursor):
-    if cursor.location:
-      if cursor.location.file:
-        loc_path = self.cpp.get_relative_path(cursor.location.file.name)
+  def get_location_str_from_object(self, object):
+    if object.location:
+      if object.location.file:
+        loc_path = self.cpp.get_relative_path(object.location.file.name)
       else:
         loc_path = "<None>"
-      str_loc = f"{loc_path}:{cursor.location.line}:{cursor.location.column}"
+      str_loc = f"{loc_path}:{object.location.line}:{object.location.column}"
+    elif object.extent:
+      if object.extent.file:
+        loc_path = self.cpp.get_relative_path(object.extent.start.file.name)
+      else:
+        loc_path = "<None>"
+      str_loc = f"{loc_path}:{object.extent.start.line}:{object.extent.start.column}"
     else:
       str_loc = "<None>"
     return str_loc
@@ -273,7 +279,7 @@ class ASTNameCollector:
       if location_str:
         adic.location_str = location_str
       else:
-        adic.location_str = self.get_location_str_from_cursor(cursor)
+        adic.location_str = self.get_location_str_from_object(cursor)
       return adic
 
     def update_dic_emitters(cursor, location_str = None, indent = ""):
@@ -308,7 +314,7 @@ class ASTNameCollector:
     # of substitution_graph.
     def walk(cursor, indent):
       if not self.cpp.is_system_macro(cursor):
-        str_loc = self.get_location_str_from_cursor(cursor)
+        str_loc = self.get_location_str_from_object(cursor)
         str_kind = str(cursor.kind).split(".")[-1]
         str_info = "\t".join([str_loc, str_kind, cursor.spelling])
 
