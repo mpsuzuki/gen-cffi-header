@@ -2,7 +2,7 @@ import re
 import keyword
 from enum import Enum
 from pathlib import Path
-from clang.cindex import Index, CursorKind, TypeKind, TranslationUnit
+from clang.cindex import Index, CursorKind, TokenKind, TypeKind, TranslationUnit
 
 from attrdict import AttrDict
 
