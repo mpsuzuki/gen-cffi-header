@@ -376,18 +376,32 @@ class ASTNameCollector:
           self.modifier.dump_extent(e_adic.cursor, "cursor", self.indent)
           self.modifier.dump_tokens_at_cursor(e_adic.cursor, self.indent * 2)
         for r_adic in e_adic.receivers:
-          r_spell_modified = self.modifier.get_modified_spelling_at_cursor(r_adic.cursor, e_spell, check_kind = False)
-          if self.debug:
+          if r_adic.cursor:
+            r_spell_modified = ( self.
+                                   modifier.
+                                   get_modified_spelling_at_cursor(r_adic.cursor,
+                                                                   e_spell,
+                                                                   check_kind = False)
+                               )
+            if self.debug:
+              print(f"{self.indent}At {r_adic.location_str}: "
+                    f"{r_adic.cursor.spelling} -> "
+                    f"{r_spell_modified}"
+              )
+            substitution_graph[r_adic.cursor] = AttrDict({
+              "location_str": r_adic.location_str,
+              "spelling_old": r_adic.cursor.spelling,
+              "spelling": r_spell_modified
+            })
+          elif r_adic.token:
+            str_cat_tokens = self.modifier.cat_tokens(r_adic.parent_cursor)
             print(f"{self.indent}At {r_adic.location_str}: "
-                  f"{r_adic.cursor.spelling} -> "
-                  f"{r_spell_modified}"
+                  f"{str(r_adic.parent_cursor.kind)} \'{str_cat_tokens}\' "
+                  "has declared/defined identifier"
+                  # f"\'{r_adic.parent_cursor.spelling}\' has declared/defined identifier, "
+                  # f"\'{r_adic.token.spelling}\' is declared/defined identifier, "
+                  # "but we are unsure it should be modified"
             )
-          substitution_graph[r_adic.cursor] = AttrDict({
-            "location_str": r_adic.location_str,
-            "spelling_old": r_adic.cursor.spelling,
-            "spelling": r_spell_modified
-          })
-
         if self.debug:
           print("")
 
