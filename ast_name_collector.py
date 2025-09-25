@@ -113,6 +113,12 @@ class ASTNameCollector:
         self.dump_extent(token, prefix = "token", indent = indent)
 
     @staticmethod
+    def cat_tokens(cursor):
+      return " ".join([t.spelling
+                       for t in cursor.translation_unit.get_tokens(extent = cursor.extent)
+                      ])
+
+    @staticmethod
     def load_name_set_from_file(path_list):
       name_set = None
       with open(path_list, "r") as fh:
