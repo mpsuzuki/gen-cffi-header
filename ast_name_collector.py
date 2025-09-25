@@ -302,19 +302,37 @@ class ASTNameCollector:
       dic_emitters[cursor.spelling] = adic
       return adic
 
-    def update_dic_receivers(cursor, location_str = None, indent = ""):
-      adic = create_attrdict_on_cursor(cursor, location_str)
-      ref_spell = cursor.referenced.spelling
-      if ref_spell in dic_receivers:
-        dic_receivers[ref_spell].add(adic)
-      else:
-        dic_receivers[ref_spell] = set([adic])
+    def update_dic_receivers(cursor, child_cursors, location_str = None, indent = ""):
+      if cursor.referenced:
+        adic = create_attrdict_on_cursor(cursor, location_str)
+        ref_spell = cursor.referenced.spelling
+        if ref_spell in dic_receivers:
+          dic_receivers[ref_spell].add(adic)
+        else:
+          dic_receivers[ref_spell] = set([adic])
 
-      if ref_spell in dic_emitters:
-        dic_emitters[ref_spell].receivers.add(adic)
-      elif self.debug:
-        print(f"{indent}# \'{ref_spell}\' is collected as emitters but never declared/defined")
-      return adic
+        if ref_spell in dic_emitters:
+          dic_emitters[ref_spell].receivers.add(adic)
+        elif self.debug:
+          print(f"{indent}# \'{ref_spell}\' is collected as emitters but never declared/defined")
+
+        return adic
+
+      elif len(child_cursors) == 0:
+        for token in cursor.translation_unit.get_tokens(extent = cursor.extent):
+          adic = create_attrdict_on_token(token, location_str)
+          if token.kind == TokenKind.IDENTIFIER:
+            adic = create_attrdict_on_token(token)
+            adic.parent_cursor = cursor
+            if token.spelling in dic_receivers:
+              dic_receivers[token.spelling].add(adic)
+            else:
+              dic_receivers[token.spelling] = set([adic])
+
+        return adic
+
+      else:
+        return None
 
     # walk() collect all candidates of emitters and receivers,
     # walk() does not care the detailed kinds and names specified
@@ -322,6 +340,7 @@ class ASTNameCollector:
     # names to be modified or preserved is delayed to the generation
     # of substitution_graph.
     def walk(cursor, indent):
+      child_cursors = list(cursor.get_children())
       if not self.cpp.is_system_macro(cursor):
         str_loc = self.get_location_str_from_object(cursor)
         str_kind = str(cursor.kind).split(".")[-1]
@@ -329,10 +348,11 @@ class ASTNameCollector:
 
         if cursor.kind in type(self).PRODUCER_KINDS:
           update_dic_emitters(cursor, location_str = str_loc, indent = indent)
-        elif cursor.kind in type(self).CONSUMER_KINDS and cursor.referenced:
-          update_dic_receivers(cursor, location_str = str_loc, indent = indent)
+        elif cursor.kind in type(self).CONSUMER_KINDS:
+          update_dic_receivers(cursor, child_cursors,
+                               location_str = str_loc, indent = indent)
 
-      for c in cursor.get_children():
+      for c in child_cursors:
         walk(c, indent + "  ")
 
     walk(header_ast.cursor, "")
