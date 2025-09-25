@@ -282,6 +282,15 @@ class ASTNameCollector:
         adic.location_str = self.get_location_str_from_object(cursor)
       return adic
 
+    def create_attrdict_on_token(token, location_str = None):
+      adic = AttrDict()
+      adic.token = token
+      if location_str:
+        adic.location_str = location_str
+      else:
+        adic.location_str = self.get_location_str_from_object(token)
+      return adic
+
     def update_dic_emitters(cursor, location_str = None, indent = ""):
       if not type(self).has_single_token_spelling(cursor):
         if self.debug:
