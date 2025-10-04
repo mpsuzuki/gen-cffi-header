@@ -71,6 +71,7 @@ def get_string_from_extent(extent):
       s0[(extent.start.column - 1):],
       s1[:(extent.end.column - 1)].split()[-1]
     ])
+
 def extent_as_string(extent, full_path = True):
   if extent.start.file is None:
     b = "<NONE>"
@@ -132,8 +133,10 @@ update_dict_path_line_string(header_ast)
 # print(dic_pls)
 walk(header_ast.cursor, "")
 
-for idfr, ad in dic_token_identifier.items():
+# for idfr, ad in dic_token_identifier.items():
+for idfr in sorted(dic_token_identifier.keys()):
   print(idfr)
+  ad = dic_token_identifier[idfr]
   for c, t in zip(ad.cursors, ad.tokens):
     ck = c.kind
     x = t.extent
