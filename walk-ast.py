@@ -112,8 +112,9 @@ def walk(cursor, indent):
         f"\'{get_string_from_extent(cursor.extent)}\'")
         # f"\'{extent_as_string(cursor.extent, False)}\'")
   child_cursors = list(cursor.get_children())
-  if len(child_cursors) == 0:
-    dump_tokens(cursor, indent)
+  dump_tokens(cursor, indent)
+  #if len(child_cursors) == 0:
+  #  dump_tokens(cursor, indent)
 
   for c in child_cursors:
     walk(c, indent + "    ")
