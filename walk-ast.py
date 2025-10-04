@@ -56,6 +56,27 @@ def get_string_from_path_line(path, line):
     return dic_pls[path][line]
   return None
 
+def extents_overlap(x1, x2):
+  if x1.start.file is None or x2.start.file is None:
+    return False # we cannot evaluate
+  if x1.start.file.name != x2.start.file.name:
+    return False
+  if x1.end.line < x2.start.line:
+    return False
+  if x2.end.line < x1.start.line:
+    return False
+  if x1.start.line < x2.start.line and x2.start.line < x1.end.line:
+    return True
+  if x2.start.line < x1.start.line and x1.start.line < x2.end.line:
+    return True
+  if x1.start.line == x2.start.line and x1.start.line == x1.end.line and x1.end.line == x2.end.line:
+    if (x1.start.column - x2.start.column) * (x1.end.column - x2.end.column) > 0:
+      return False
+    else:
+      return True
+  else:
+    return False
+
 def get_string_from_extent(extent):
   if extent.start.file is None or extent.start.file.name is None:
     return "<extent.start.file is None>"
