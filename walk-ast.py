@@ -90,6 +90,22 @@ def extent_as_string(extent, full_path = True):
       f"{extent.start.column}..{extent.end.column}"
     )
 
+def dump_tokens(cursor, indent):
+  for t in cursor.translation_unit.get_tokens(extent = cursor.extent):
+    token_line_first = t.spelling.split()[0]
+    print(f"{indent}  {t.kind} {token_line_first}")
+    if t.kind == TokenKind.IDENTIFIER and t.extent.start.file is not None:
+      tspl = t.spelling
+      if tspl not in dic_token_identifier:
+        dic_token_identifier[tspl] = AttrDict()
+        dic_token_identifier[tspl].cursors = []
+        dic_token_identifier[tspl].tokens = []
+      sx = extent_as_string(t.extent)
+      if not any(extent_as_string(t.extent) == sx for t in dic_token_identifier[tspl].tokens):
+        dic_token_identifier[tspl].cursors.append(cursor)
+        dic_token_identifier[tspl].tokens.append(t)
+  print("")
+
 def walk(cursor, indent):
   # print(f"{indent}{str(cursor.kind)} \'{get_string_from_extent(cursor.extent)}\'")
   print(f"{indent}{str(cursor.kind)} \'{cursor.spelling}\' in "
@@ -97,19 +113,7 @@ def walk(cursor, indent):
         # f"\'{extent_as_string(cursor.extent, False)}\'")
   child_cursors = list(cursor.get_children())
   if len(child_cursors) == 0:
-    for t in cursor.translation_unit.get_tokens(extent = cursor.extent):
-      token_line_first = t.spelling.split()[0]
-      print(f"{indent}  {t.kind} {token_line_first}")
-      if t.kind == TokenKind.IDENTIFIER and t.extent.start.file is not None:
-        tspl = t.spelling
-        if tspl not in dic_token_identifier:
-          dic_token_identifier[tspl] = AttrDict()
-          dic_token_identifier[tspl].cursors = []
-          dic_token_identifier[tspl].tokens = []
-        sx = extent_as_string(t.extent)
-        if not any(extent_as_string(t.extent) == sx for t in dic_token_identifier[tspl].tokens):
-          dic_token_identifier[tspl].cursors.append(cursor)
-          dic_token_identifier[tspl].tokens.append(t)
+    dump_tokens(cursor, indent)
 
   for c in child_cursors:
     walk(c, indent + "    ")
