@@ -90,40 +90,44 @@ class ClangASTWalker:
 
 
   def get_string_from_extent(self, extent):
-    if extent.start.file is None or extent.start.file.name is None:
+    x0 = extent.start
+    x1 = extent.end
+    if x0.file is None or x0.file.name is None:
       return "<extent.start.file is None>"
 
-    s0 = self.get_string_from_path_line(extent.start.file.name, extent.start.line)
+    s0 = self.get_string_from_path_line(x0.file.name, x0.line)
     if s0 is None:
-      return f"<cannot get string for {extent.start.file.name}:{extent.start.line}>"
-    elif extent.start.line == extent.end.line:
-      return s0[(extent.start.column - 1):(extent.end.column - 1)]
+      return f"<cannot get string for {x0.file.name}:{x0.line}>"
+    elif x0.line == x1.line:
+      return s0[(x0.column - 1):(x1.column - 1)]
     else:
-      s1 = self.get_string_from_path_line(extent.end.file.name, extent.end.line)
+      s1 = self.get_string_from_path_line(x1.file.name, x1.line)
       return " ... ".join([
-        s0[(extent.start.column - 1):],
-        s1[:(extent.end.column - 1)].split()[-1]
+        s0[(x0.column - 1):],
+        s1[:(x1.column - 1)].split()[-1]
       ])
 
 
   @staticmethod
   def extent_as_string(extent, full_path = True):
-    if extent.start.file is None:
+    x0 = extent.start
+    x1 = extent.end
+    if x0.file is None:
       b = "<NONE>"
     elif full_path:
-      b = extent.start.file.name
+      b = x0.file.name
     else:
-      b = Path(extent.start.file.name).name
+      b = Path(x0.file.name).name
 
-    if extent.start.line != extent.end.line:
+    if x0.line != x1.line:
       return (
-        f"{b}:{extent.start.line}:{extent.start.column}.."
-        f"{extent.end.line}:{extent.end.column}"
+        f"{b}:{x0.line}:{x0.column}.."
+        f"{x1.line}:{x1.column}"
       )
     else:
       return (
-        f"{b}:{extent.start.line}:"
-        f"{extent.start.column}..{extent.end.column}"
+        f"{b}:{x0.line}:"
+        f"{x0.column}..{x1.column}"
       )
 
   def dump_tokens(self, cursor, indent):
