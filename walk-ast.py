@@ -138,6 +138,28 @@ class ClangASTWalker:
       print(f"{indent}  {t.kind} {token_line_first}")
     print("")
 
+
+  regex_angle_bracketed_at_end = re.compile(r"<[^<>\s]+>\s*$")
+
+  def ends_with_angle_bracketed(self, str):
+    return bool(self.regex_angle_bracketed_at_end.search(str))
+
+  def is_macro_defines_to_angle_bracketed(self, cursor):
+    if cursor.kind != CursorKind.MACRO_DEFINITION:
+      return False
+
+    x = self.get_string_from_extent(cursor.extent)
+    return self.ends_with_angle_bracketed(x)
+
+  def get_angle_bracketed_from_cursor(self, cursor):
+    s = self.get_string_from_extent(cursor.extent)
+    m = self.regex_angle_bracketed_at_end.search(s)
+    if m is None:
+      return None
+    else:
+      return m.group()
+
+
   def walk(self, cursor, indent = "", verbose = False):
     dic_token_identifier = self._dic_token_identifier
     if verbose:
