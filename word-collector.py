@@ -54,4 +54,4 @@ header_ast = index.parse(args.extras[0], args = [
 substitution_graph = name_collector.get_substitution_graph(header_ast)
 
 for emitter_cursor, adic in substitution_graph.items():
-  print(f"{adic.location_str} {adic.spelling_old} -> {adic.spelling}")
+  print(f"{adic.extent_wrap.to_string()} {adic.spelling_old} -> {adic.spelling}")

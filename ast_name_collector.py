@@ -308,59 +308,42 @@ class ASTNameCollector:
   def has_single_token_spelling(cursor):
     return (len(cursor.spelling.split()) == 1)
 
-  def get_location_str_from_object(self, object):
-    if object.location:
-      if object.location.file:
-        loc_path = self.cpp.get_relative_path(object.location.file.name)
-      else:
-        loc_path = "<None>"
-      str_loc = f"{loc_path}:{object.location.line}:{object.location.column}"
-    elif object.extent:
-      if object.extent.file:
-        loc_path = self.cpp.get_relative_path(object.extent.start.file.name)
-      else:
-        loc_path = "<None>"
-      str_loc = f"{loc_path}:{object.extent.start.line}:{object.extent.start.column}"
-    else:
-      str_loc = "<None>"
-    return str_loc
-
   def get_substitution_graph(self, header_ast):
     dic_emitters = dict()
     dic_receivers = dict()
 
-    def create_attrdict_on_cursor(cursor, location_str = None):
+    def create_attrdict_on_cursor(cursor, extent_wrap = None):
       adic = AttrDict()
       adic.cursor = cursor
-      if location_str:
-        adic.location_str = location_str
+      if extent_wrap:
+        adic.extent_wrap = extent_wrap
       else:
-        adic.location_str = self.get_location_str_from_object(cursor)
+        adic.extent_wrap = ExtentWrapper.from_cursor(cursor, include_dirs = self.cpp.include_dirs)
       return adic
 
-    def create_attrdict_on_token(token, location_str = None):
+    def create_attrdict_on_token(token, extent_wrap = None):
       adic = AttrDict()
       adic.token = token
-      if location_str:
-        adic.location_str = location_str
+      if extent_wrap:
+        adic.extent_wrap = extent_wrap
       else:
-        adic.location_str = self.get_location_str_from_object(token)
+        adic.extent_wrap = ExtentWrapper(token.extent, include_dirs = self.cpp.include_dirs)
       return adic
 
-    def update_dic_emitters(cursor, location_str = None, indent = ""):
+    def update_dic_emitters(cursor, extent_wrap = None, indent = ""):
       if not type(self).has_single_token_spelling(cursor):
         if self.debug:
           print(f"{indent}# \'{cursor.spelling}\' has no name, do not collect")
         return None
 
-      adic = create_attrdict_on_cursor(cursor, location_str = location_str)
+      adic = create_attrdict_on_cursor(cursor, extent_wrap = extent_wrap)
       adic.receivers = set({})
       dic_emitters[cursor.spelling] = adic
       return adic
 
-    def update_dic_receivers(cursor, child_cursors, location_str = None, indent = ""):
+    def update_dic_receivers(cursor, child_cursors, extent_wrap = None, indent = ""):
       if cursor.referenced:
-        adic = create_attrdict_on_cursor(cursor, location_str)
+        adic = create_attrdict_on_cursor(cursor, extent_wrap)
         ref_spell = cursor.referenced.spelling
         if ref_spell in dic_receivers:
           dic_receivers[ref_spell].add(adic)
@@ -376,7 +359,7 @@ class ASTNameCollector:
 
       elif len(child_cursors) == 0:
         for token in cursor.translation_unit.get_tokens(extent = cursor.extent):
-          adic = create_attrdict_on_token(token, location_str)
+          adic = create_attrdict_on_token(token, extent_wrap)
           if token.kind == TokenKind.IDENTIFIER:
             adic = create_attrdict_on_token(token)
             adic.parent_cursor = cursor
@@ -398,15 +381,15 @@ class ASTNameCollector:
     def walk(cursor, indent):
       child_cursors = list(cursor.get_children())
       if not self.cpp.is_system_macro(cursor):
-        str_loc = self.get_location_str_from_object(cursor)
+        extent_wrap = ExtentWrapper.from_cursor(cursor, include_dirs = self.cpp.include_dirs)
         str_kind = str(cursor.kind).split(".")[-1]
-        str_info = "\t".join([str_loc, str_kind, cursor.spelling])
+        str_info = "\t".join([extent_wrap.to_string(), str_kind, cursor.spelling])
 
         if cursor.kind in type(self).PRODUCER_KINDS:
-          update_dic_emitters(cursor, location_str = str_loc, indent = indent)
+          update_dic_emitters(cursor, extent_wrap = extent_wrap, indent = indent)
         elif cursor.kind in type(self).CONSUMER_KINDS:
           update_dic_receivers(cursor, child_cursors,
-                               location_str = str_loc, indent = indent)
+                               extent_wrap = extent_wrap, indent = indent)
 
       for c in child_cursors:
         walk(c, indent + "  ")
@@ -423,12 +406,12 @@ class ASTNameCollector:
       e_spell_modified = self.modifier.modify_name(e_spell, e_adic.cursor.kind)
       if e_spell_modified != e_spell:
         substitution_graph[e_adic.cursor] = AttrDict({
-          "location_str": e_adic.location_str,
+          "extent_wrap": e_adic.extent_wrap,
           "spelling_old": e_spell,
           "spelling": e_spell_modified
         })
         if self.debug:
-          print(f"At {e_adic.location_str}: {e_spell} -> {e_spell_modified}")
+          print(f"At {e_adic.extent_wrap.to_string()}: {e_spell} -> {e_spell_modified}")
           self.modifier.dump_extent(e_adic.cursor, "cursor", self.indent)
           self.modifier.dump_tokens_at_cursor(e_adic.cursor, self.indent * 2)
         for r_adic in e_adic.receivers:
@@ -440,18 +423,18 @@ class ASTNameCollector:
                                                                    check_kind = False)
                                )
             if self.debug:
-              print(f"{self.indent}At {r_adic.location_str}: "
+              print(f"{self.indent}At {r_adic.extent_wrap.to_string()}: "
                     f"{r_adic.cursor.spelling} -> "
                     f"{r_spell_modified}"
               )
             substitution_graph[r_adic.cursor] = AttrDict({
-              "location_str": r_adic.location_str,
+              "extent_wrap": r_adic.extent_wrap,
               "spelling_old": r_adic.cursor.spelling,
               "spelling": r_spell_modified
             })
           elif r_adic.token:
             str_cat_tokens = self.modifier.cat_tokens(r_adic.parent_cursor)
-            print(f"{self.indent}At {r_adic.location_str}: "
+            print(f"{self.indent}At {r_adic.extent_wrap.to_string()}: "
                   f"{str(r_adic.parent_cursor.kind)} \'{str_cat_tokens}\' "
                   "has declared/defined identifier"
                   # f"\'{r_adic.parent_cursor.spelling}\' has declared/defined identifier, "
