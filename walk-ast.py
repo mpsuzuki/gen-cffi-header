@@ -167,6 +167,13 @@ class ClangASTWalker:
       print(f"{indent}{str(cursor.kind)} \'{cursor.spelling}\' in "
             f"\'{self.get_string_from_extent(cursor.extent)}\'")
             # f"\'{self.extent_as_string(cursor.extent, False)}\'")
+    # preprocessor does not deal <...> as single token, but we do for FreeType2.
+    if self.is_macro_defines_to_angle_bracketed(cursor):
+      if verbose:
+        dst = self.get_angle_bracketed_from_cursor(cursor)
+        print(f"{indent}  {cursor.spelling} -> {dst}")
+      return
+
     if verbose:
       self.dump_tokens(cursor, indent)
 
