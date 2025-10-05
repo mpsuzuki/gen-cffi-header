@@ -130,14 +130,27 @@ class ClangASTWalker:
         f"{x0.column}..{x1.column}"
       )
 
-  def dump_tokens(self, cursor, indent):
+  def dump_tokens(self, cursor, indent = ""):
     dic_token_identifier = self._dic_token_identifier
     for t in cursor.translation_unit.get_tokens(extent = cursor.extent):
       token_line_first = t.spelling.split()[0]
       print(f"{indent}  {t.kind} {token_line_first}")
+    print("")
+
+  def walk(self, cursor, indent = "", verbose = False):
+    dic_token_identifier = self._dic_token_identifier
+    if verbose:
+      # print(f"{indent}{str(cursor.kind)} \'{get_string_from_extent(cursor.extent)}\'")
+      print(f"{indent}{str(cursor.kind)} \'{cursor.spelling}\' in "
+            f"\'{self.get_string_from_extent(cursor.extent)}\'")
+            # f"\'{self.extent_as_string(cursor.extent, False)}\'")
+    child_cursors = list(cursor.get_children())
+    if verbose:
+      self.dump_tokens(cursor, indent)
+    for t in cursor.translation_unit.get_tokens(extent = cursor.extent):
       if t.kind == TokenKind.IDENTIFIER and t.extent.start.file is not None:
         tspl = t.spelling
-        if tspl not in self._dic_token_identifier:
+        if tspl not in dic_token_identifier:
           dic_token_identifier[tspl] = AttrDict()
           dic_token_identifier[tspl].cursors = []
           dic_token_identifier[tspl].tokens = []
@@ -145,15 +158,6 @@ class ClangASTWalker:
         if not any(self.extent_as_string(t.extent) == sx for t in dic_token_identifier[tspl].tokens):
           dic_token_identifier[tspl].cursors.append(cursor)
           dic_token_identifier[tspl].tokens.append(t)
-    print("")
-
-  def walk(self, cursor, indent):
-    # print(f"{indent}{str(cursor.kind)} \'{get_string_from_extent(cursor.extent)}\'")
-    print(f"{indent}{str(cursor.kind)} \'{cursor.spelling}\' in "
-          f"\'{self.get_string_from_extent(cursor.extent)}\'")
-          # f"\'{self.extent_as_string(cursor.extent, False)}\'")
-    child_cursors = list(cursor.get_children())
-    self.dump_tokens(cursor, indent)
     #if len(child_cursors) == 0:
     #  self.dump_tokens(cursor, indent)
 
@@ -171,8 +175,12 @@ class ClangASTWalker:
         x = t.extent
         sx = self.extent_as_string(x, False)
         l = self.get_string_from_path_line(x.start.file.name, x.start.line)
-        print(f"  {ck} {sx} {l}")
+        print(f"  {ck} {sx} \'{l}\'")
 
+  def install_ast(self, header_ast, indent = "", verbose = False):
+    self.update_dict_path_line_string(header_ast)
+    self.walk(header_ast.cursor, indent, verbose)
+    return self
 
 index = Index.create()
 header_ast = index.parse(args.extras[0], args = [
@@ -183,7 +191,9 @@ header_ast = index.parse(args.extras[0], args = [
   0x04 | TranslationUnit.PARSE_DETAILED_PROCESSING_RECORD
 ))
 
-ast_walker = ClangASTWalker()
-ast_walker.update_dict_path_line_string(header_ast)
-ast_walker.walk(header_ast.cursor, "")
+#ast_walker.update_dict_path_line_string(header_ast)
+#ast_walker.walk(header_ast.cursor, indent = "", verbose = args.verbose)
+## ast_walker.dump_dict()
+
+ast_walker = ClangASTWalker().install_ast(header_ast)
 ast_walker.dump_dict()
