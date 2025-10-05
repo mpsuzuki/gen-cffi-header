@@ -145,9 +145,10 @@ class ClangASTWalker:
       print(f"{indent}{str(cursor.kind)} \'{cursor.spelling}\' in "
             f"\'{self.get_string_from_extent(cursor.extent)}\'")
             # f"\'{self.extent_as_string(cursor.extent, False)}\'")
-    child_cursors = list(cursor.get_children())
     if verbose:
       self.dump_tokens(cursor, indent)
+
+    child_cursors = list(cursor.get_children())
     for t in cursor.translation_unit.get_tokens(extent = cursor.extent):
       if t.kind == TokenKind.IDENTIFIER and t.extent.start.file is not None:
         tspl = t.spelling
