@@ -24,7 +24,7 @@ def is_oct_dec_hex(s):
 
 parser = argparse.ArgumentParser(add_help = True)
 parser.add_argument("--verbose", "-v", action = "store_true",
-                    help = "verbose mode")
+                    help = "Verbose mode")
 parser.add_argument("-I", dest = "include_dirs",
                     action = "append", type = str, default = [],
                     help = "Include directories")
