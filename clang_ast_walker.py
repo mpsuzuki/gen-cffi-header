@@ -5,6 +5,33 @@ from clang.cindex import Index, CursorKind, TokenKind, TypeKind, TranslationUnit
 
 from attrdict import AttrDict
 
+regex_angle_bracketed_at_end = re.compile(r"<[^<>\s]+>\s*$")
+
+def ends_with_angle_bracketed(str):
+  return bool(regex_angle_bracketed_at_end.search(str))
+
+
+def extent_as_string(extent, full_path = True):
+  x0 = extent.start
+  x1 = extent.end
+  if x0.file is None:
+    b = "<NONE>"
+  elif full_path:
+    b = x0.file.name
+  else:
+    b = Path(x0.file.name).name
+
+  if x0.line != x1.line:
+    return (
+      f"{b}:{x0.line}:{x0.column}.."
+      f"{x1.line}:{x1.column}"
+    )
+  else:
+    return (
+      f"{b}:{x0.line}:"
+      f"{x0.column}..{x1.column}"
+    )
+
 class ClangASTWalker:
   def __init__(self):
     self._dic_pls = dict()
@@ -34,31 +61,6 @@ class ClangASTWalker:
     return None
 
 
-  @staticmethod
-  def extents_overlap(x1, x2):
-    if x1.start.file is None or x2.start.file is None:
-      return False # we cannot evaluate
-    if x1.start.file.name != x2.start.file.name:
-      return False
-    if x1.end.line < x2.start.line:
-      return False
-    if x2.end.line < x1.start.line:
-      return False
-    if x1.start.line < x2.start.line and x2.start.line < x1.end.line:
-      return True
-    if x2.start.line < x1.start.line and x1.start.line < x2.end.line:
-      return True
-    if (x1.start.line == x2.start.line and
-        x1.start.line == x1.end.line and
-        x1.end.line == x2.end.line):
-      if (x1.start.column - x2.start.column) * (x1.end.column - x2.end.column) > 0:
-        return False
-      else:
-        return True
-    else:
-      return False
-
-
   def get_string_from_extent(self, extent):
     x0 = extent.start
     x1 = extent.end
@@ -78,28 +80,6 @@ class ClangASTWalker:
       ])
 
 
-  @staticmethod
-  def extent_as_string(extent, full_path = True):
-    x0 = extent.start
-    x1 = extent.end
-    if x0.file is None:
-      b = "<NONE>"
-    elif full_path:
-      b = x0.file.name
-    else:
-      b = Path(x0.file.name).name
-
-    if x0.line != x1.line:
-      return (
-        f"{b}:{x0.line}:{x0.column}.."
-        f"{x1.line}:{x1.column}"
-      )
-    else:
-      return (
-        f"{b}:{x0.line}:"
-        f"{x0.column}..{x1.column}"
-      )
-
   def dump_tokens(self, cursor, indent = ""):
     dic_token_identifier = self._dic_token_identifier
     for t in cursor.translation_unit.get_tokens(extent = cursor.extent):
@@ -108,21 +88,16 @@ class ClangASTWalker:
     print("")
 
 
-  regex_angle_bracketed_at_end = re.compile(r"<[^<>\s]+>\s*$")
-
-  def ends_with_angle_bracketed(self, str):
-    return bool(self.regex_angle_bracketed_at_end.search(str))
-
   def is_macro_defines_to_angle_bracketed(self, cursor):
     if cursor.kind != CursorKind.MACRO_DEFINITION:
       return False
 
     x = self.get_string_from_extent(cursor.extent)
-    return self.ends_with_angle_bracketed(x)
+    return ends_with_angle_bracketed(x)
 
   def get_angle_bracketed_from_cursor(self, cursor):
     s = self.get_string_from_extent(cursor.extent)
-    m = self.regex_angle_bracketed_at_end.search(s)
+    m = regex_angle_bracketed_at_end.search(s)
     if m is None:
       return None
     else:
@@ -135,7 +110,7 @@ class ClangASTWalker:
       # print(f"{indent}{str(cursor.kind)} \'{get_string_from_extent(cursor.extent)}\'")
       print(f"{indent}{str(cursor.kind)} \'{cursor.spelling}\' in "
             f"\'{self.get_string_from_extent(cursor.extent)}\'")
-            # f"\'{self.extent_as_string(cursor.extent, False)}\'")
+            # f"\'{extent_as_string(cursor.extent, False)}\'")
     # preprocessor does not deal <...> as single token, but we do for FreeType2.
     if self.is_macro_defines_to_angle_bracketed(cursor):
       if verbose:
@@ -154,8 +129,8 @@ class ClangASTWalker:
           dic_token_identifier[tspl] = AttrDict()
           dic_token_identifier[tspl].cursors = []
           dic_token_identifier[tspl].tokens = []
-        sx = self.extent_as_string(t.extent)
-        if not any(self.extent_as_string(t.extent) == sx for t in dic_token_identifier[tspl].tokens):
+        sx = extent_as_string(t.extent)
+        if not any(extent_as_string(t.extent) == sx for t in dic_token_identifier[tspl].tokens):
           dic_token_identifier[tspl].cursors.append(cursor)
           dic_token_identifier[tspl].tokens.append(t)
     #if len(child_cursors) == 0:
@@ -179,7 +154,7 @@ class ClangASTWalker:
       for c, t in zip(ad.cursors, ad.tokens):
         ck = c.kind
         x = t.extent
-        sx = self.extent_as_string(x, False)
+        sx = extent_as_string(x, False)
         l = self.get_string_from_path_line(x.start.file.name, x.start.line)
         print(f"  {ck} {sx} \'{l}\'")
 
