@@ -6,6 +6,62 @@ from clang.cindex import Index, CursorKind, TokenKind, TypeKind, TranslationUnit
 
 from attrdict import AttrDict
 
+class ExtentWrapper:
+  def __init__(self, extent, include_dirs = [], spelling = None):
+    self.extent = extent
+    self.spelling = spelling
+    self.include_dirs = [Path(d).resolve() for d in include_dirs]
+
+  @classmethod
+  def from_cursor(cls, cursor, include_dirs = []):
+    if cursor is None:
+      raise TypeError("ExtentWrapper.from_cursor() requires valid Cursor object")
+    ew = cls(None, include_dirs = include_dirs, spelling = cursor.spelling)
+    ew.extent = AttrDict({})
+    ew.extent.start = AttrDict({})
+    ew.extent.end = AttrDict({})
+    ew.extent.start.file = cursor.location.file
+    ew.extent.start.line = cursor.location.line
+    ew.extent.start.column = cursor.location.column
+    ew.extent.end.file = cursor.location.file
+    ew.extent.end.line = cursor.location.line
+    ew.extent.end.column = cursor.location.column + len(cursor.spelling)
+    return ew
+
+  def is_single_file(self):
+    if self.extent.start.file is None or self.extent.end.file is None:
+      return False
+    elif self.extent.start.file.name != self.extent.end.file.name: # not precise, like a.h -> b.h -> a.h
+      return False
+    else:
+      return True
+
+  def is_single_line(self):
+    if not self.is_single_file():
+      return False
+    elif self.extent.start.line != self.extent.end.line:
+      return False
+    else:
+      return True
+
+  def to_string(self, do_relative = False):
+    if not self.is_single_file():
+      return None
+
+    file_path = Path(self.extent.start.file.name).resolve()
+    file_name = min([
+      str(file_path.relative_to(d))
+      for d in self.include_dirs
+      if file_path.is_relative_to(d)
+    ], key = len)
+
+    if self.is_single_line():
+      return ( f"{file_name}:{self.extent.start.line}:{self.extent.start.column}"
+               f"..{self.extent.end.column}" )
+    else:
+      return ( f"{file_name}:{self.extent.start.line}:{self.extent.start.column}"
+               f"..{self.extent.end.line}:{self.extent.end.column}" )
+
 class ASTNameCollector:
   PRODUCER_KINDS = {
     CursorKind.STRUCT_DECL,
