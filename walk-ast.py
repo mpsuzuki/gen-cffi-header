@@ -2,6 +2,7 @@
 import re
 import keyword
 from enum import Enum
+from types import MappingProxyType
 from pathlib import Path
 from clang.cindex import Index, CursorKind, TokenKind, TypeKind, TranslationUnit
 
@@ -164,6 +165,12 @@ class ClangASTWalker:
     for c in child_cursors:
       self.walk(c, indent + "    ")
 
+  def get_identifier_dict(self):
+    return MappingProxyType({
+      k: v.get_sealed() # should we test v is AttrDict() ?
+      for k, v in self._dic_token_identifier.items()
+    })
+
   def dump_dict(self):
     dic_token_identifier = self._dic_token_identifier
     # for idfr, ad in dic_token_identifier.items():
@@ -197,3 +204,6 @@ header_ast = index.parse(args.extras[0], args = [
 
 ast_walker = ClangASTWalker().install_ast(header_ast)
 ast_walker.dump_dict()
+dic_idfr = ast_walker.get_identifier_dict()
+# print(dic_idfr)
+# print(dic_idfr.keys())
