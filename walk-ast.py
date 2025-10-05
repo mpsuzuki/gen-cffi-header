@@ -163,7 +163,7 @@ class ClangASTWalker:
     #  self.dump_tokens(cursor, indent)
 
     for c in child_cursors:
-      self.walk(c, indent + "    ")
+      self.walk(c, indent = (indent + "    "), verbose = verbose)
 
   def get_identifier_dict(self):
     return MappingProxyType({
@@ -202,7 +202,7 @@ header_ast = index.parse(args.extras[0], args = [
 #ast_walker.walk(header_ast.cursor, indent = "", verbose = args.verbose)
 ## ast_walker.dump_dict()
 
-ast_walker = ClangASTWalker().install_ast(header_ast)
+ast_walker = ClangASTWalker().install_ast(header_ast, verbose = args.verbose)
 ast_walker.dump_dict()
 dic_idfr = ast_walker.get_identifier_dict()
 # print(dic_idfr)
